@@ -1,5 +1,6 @@
 ## phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
+## last updated 03/12/2023
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -15,6 +16,7 @@ library(treeio)
 library(ggtree)
 library(car)
 library(phylofactor)
+library(phytools)
 
 ## load in data
 setwd("~/Desktop/synurbat/flat files")
@@ -56,6 +58,46 @@ set=cdata[!is.na(cdata$data$Synurbic),]
 ## D of 0 = Brownian model, D of 1 = random (no phylogenetic signal)
 set.seed(1)
 mod=phylo.d(set,binvar=Synurbic,permut=1000); mod
+
+## extract states
+state=setNames(set$data$Synurbic,rownames(set$data))
+
+## fit models
+ER.model=fitMk(set$phy,state,model="ER") 
+ARD.model=fitMk(set$phy,state,model="ARD") 
+Irr1.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE)) 
+Irr2.model=fitMk(set$phy,state,model=matrix(c(0,0,1,0),2,2,byrow=TRUE))
+
+## model comparison
+state.aov=anova(ER.model,ARD.model,Irr1.model,Irr2.model)
+
+## simmap
+state.simmap=simmap(state.aov,nsim=100)
+
+## set colors and plot
+cols=setNames(viridisLite::viridis(n=2),levels(state)) 
+plot(summary(state.simmap),ftype="i", fsize=0.7,colors=cols,cex=c(0.6,0.3))
+
+## get density
+state.density=density(state.simmap)
+
+## plot
+par(mfrow=c(1,2),mar=c(4.5,4.5,0.5,0.5))
+COLS<-setNames(cols,state.density$trans) 
+plot(state.density,ylim=c(0,0.6), transition=names(COLS)[1],colors=COLS[1],main="") 
+mtext("a)transitionstopiscivory",line=1, adj=0,cex=0.8) 
+
+## other
+plot(state.density,ylim=c(0,0.6), transition=names(COLS)[2],colors=COLS[2], main="") 
+mtext("b)transitionstonon-piscivory", line=1,adj=0,cex=0.8)
+
+## density map
+state.densityMap=densityMap(state.simmap, plot=FALSE,res=100) 
+
+## plot
+state.densityMap=setMap(state.densityMap, viridisLite::viridis(n=10)) 
+par(mfrow=c(1,1),mar=c(0.5,0.5,0.5,0.5))
+plot(state.densityMap,lwd=1,outline=F)
 
 ## taxonomy
 set$data$taxonomy=paste(set$data$fam,set$data$gen,set$data$Species,sep='; ')
