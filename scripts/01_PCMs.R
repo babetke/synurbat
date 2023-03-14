@@ -59,24 +59,45 @@ set=cdata[!is.na(cdata$data$Synurbic),]
 set.seed(1)
 mod=phylo.d(set,binvar=Synurbic,permut=1000); mod
 
+## state-as-factor
+set$data$synroot=factor(set$data$Synurbic)
+
 ## extract states
 state=setNames(set$data$Synurbic,rownames(set$data))
 
+## set prior on root node as non-anthropogenic
+rootn=c(1,0)
+names(rootn)=levels(set$data$synroot)
+
 ## fit models
-ER.model=fitMk(set$phy,state,model="ER") 
-ARD.model=fitMk(set$phy,state,model="ARD") 
-Irr1.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE)) 
-Irr2.model=fitMk(set$phy,state,model=matrix(c(0,0,1,0),2,2,byrow=TRUE))
+ER.model=fitMk(set$phy,state,model="ER",pi=as.matrix(rootn)) 
+ARD.model=fitMk(set$phy,state,model="ARD",pi=as.matrix(rootn)) 
+SYM.model=fitMk(set$phy,state,model="SYM",pi=as.matrix(rootn)) 
+Irr1.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
+                 pi=as.matrix(rootn)) 
+Irr2.model=fitMk(set$phy,state,model=matrix(c(0,0,1,0),2,2,byrow=TRUE),
+                 pi=as.matrix(rootn))
 
 ## model comparison
-state.aov=anova(ER.model,ARD.model,Irr1.model,Irr2.model)
+state.aov=anova(ER.model,ARD.model,SYM.model,Irr1.model,Irr2.model)
+round(state.aov$weight,2)
+
+## plot
+plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
+
+## try without root
+ARD.model.null=fitMk(set$phy,state,model="ARD") 
+plot(ARD.model.null,width=T,color=T,offset=0.1,tol=0)
 
 ## simmap
 state.simmap=simmap(state.aov,nsim=100)
 
+## summarize
+simsum=summary(state.simmap)
+
 ## set colors and plot
-cols=setNames(viridisLite::viridis(n=2),levels(state)) 
-plot(summary(state.simmap),ftype="i", fsize=0.7,colors=cols,cex=c(0.6,0.3))
+cols=setNames(viridisLite::viridis(n=2),levels(set$data$synroot)) 
+plot(simsum,ftype="i", fsize=0.7,colors=cols,cex=0.5)
 
 ## get density
 state.density=density(state.simmap)
@@ -84,20 +105,23 @@ state.density=density(state.simmap)
 ## plot
 par(mfrow=c(1,2),mar=c(4.5,4.5,0.5,0.5))
 COLS<-setNames(cols,state.density$trans) 
-plot(state.density,ylim=c(0,0.6), transition=names(COLS)[1],colors=COLS[1],main="") 
-mtext("a)transitionstopiscivory",line=1, adj=0,cex=0.8) 
+plot(state.density,transition=names(COLS)[1],colors=COLS[1],main="") 
+mtext("a) transitions to anthropogenic roosting",line=-1) 
 
 ## other
-plot(state.density,ylim=c(0,0.6), transition=names(COLS)[2],colors=COLS[2], main="") 
-mtext("b)transitionstonon-piscivory", line=1,adj=0,cex=0.8)
+plot(state.density,transition=names(COLS)[2],colors=COLS[2], main="") 
+mtext("b) transitions to natural roosting", line=-1,adj=0)
 
 ## density map
-state.densityMap=densityMap(state.simmap, plot=FALSE,res=100) 
+state.densityMap=densityMap(state.simmap, plot=FALSE,res=10) 
 
 ## plot
 state.densityMap=setMap(state.densityMap, viridisLite::viridis(n=10)) 
 par(mfrow=c(1,1),mar=c(0.5,0.5,0.5,0.5))
-plot(state.densityMap,lwd=1,outline=F)
+plot(state.densityMap,lwd=2,outline=F,ftype="off",type="fan")
+
+## add nodes
+nodelabels(pie=simsum$ace,piecol=cols,cex=0.3)
 
 ## taxonomy
 set$data$taxonomy=paste(set$data$fam,set$data$gen,set$data$Species,sep='; ')
