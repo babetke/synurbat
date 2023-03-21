@@ -1,6 +1,6 @@
-## phylogenetic analyses of bat roosting data
+## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 03/12/2023
+## last updated 03/20/2023
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -18,29 +18,33 @@ library(car)
 library(phylofactor)
 library(phytools)
 
-## load in data
+## load in roosting data
 setwd("~/Desktop/synurbat/flat files")
 data=read.csv("Bat References Spreadsheet.csv")
 
-## load in Upham phylogeny
-setwd("~/Desktop/bathaus/phylos")
-tree=read.nexus('MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre')
-
 ## load in taxonomy
+setwd("~/Desktop/bathaus/phylos")
 taxa=read.csv('taxonomy_mamPhy_5911species.csv',header=T)
 taxa=taxa[taxa$ord=="CHIROPTERA",]
 taxa$tip=taxa$Species_Name
-
-## trim phylo to bats
-tree=keep.tip(tree,taxa$tiplabel)
-
-## fix tip
-tree$tip.label=sapply(strsplit(tree$tip.label,'_'),function(x) paste(x[1],x[2],sep=' '))
 taxa$species=sapply(strsplit(taxa$tip,'_'),function(x) paste(x[1],x[2],sep=' '))
 
 ## merge data and taxa by species
-data=merge(data,taxa[c("species","fam","gen","clade")],by="species")
+data=merge(data,taxa[c("species","fam","gen","clade","extinct.","tiplabel")],by="species")
 rm(taxa)
+
+## remove extinc
+data=data[!data$extinct.==1,]
+data$extinct.=NULL
+
+## load in Upham phylogeny
+tree=read.nexus('MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre')
+
+## trim phylo to bats
+tree=keep.tip(tree,data$tiplabel)
+
+## fix tip
+tree$tip.label=sapply(strsplit(tree$tip.label,'_'),function(x) paste(x[1],x[2],sep=' '))
 
 ## make label
 data$label=data$species
@@ -51,94 +55,38 @@ cdata=comparative.data(phy=tree,data=data,names.col=label,vcv=T,na.omit=F,warn.d
 ## species
 cdata$data$Species=cdata$data$species
 
+## make Synurbic with pseudoabsences
+cdata$data$Synurbic_pseudo=ifelse(is.na(cdata$data$Synurbic),0,cdata$data$Synurbic)
+
+## taxonomy
+cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
+
+## log1p citations
+hist(cdata$data$cites)
+hist(log1p(cdata$data$cites))
+hist(sqrt(cdata$data$cites))
+cdata$data$logcites=log1p(cdata$data$cites)
+
+## save status and label
+cdata$data$status=factor(cdata$data$Synurbic)
+cdata$data$label=cdata$data$species
+
 ## trim to tree with data
 set=cdata[!is.na(cdata$data$Synurbic),]
 
-## phylogenetic signal in response
+## phylogenetic signal in response for true and pseudo
 ## D of 0 = Brownian model, D of 1 = random (no phylogenetic signal)
 set.seed(1)
-mod=phylo.d(set,binvar=Synurbic,permut=1000); mod
-
-## state-as-factor
-set$data$synroot=factor(set$data$Synurbic)
-
-## extract states
-state=setNames(set$data$Synurbic,rownames(set$data))
-
-## set prior on root node as non-anthropogenic
-rootn=c(1,0)
-names(rootn)=levels(set$data$synroot)
-
-## fit models
-ER.model=fitMk(set$phy,state,model="ER",pi=as.matrix(rootn)) 
-ARD.model=fitMk(set$phy,state,model="ARD",pi=as.matrix(rootn)) 
-SYM.model=fitMk(set$phy,state,model="SYM",pi=as.matrix(rootn)) 
-Irr1.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
-                 pi=as.matrix(rootn)) 
-Irr2.model=fitMk(set$phy,state,model=matrix(c(0,0,1,0),2,2,byrow=TRUE),
-                 pi=as.matrix(rootn))
-
-## model comparison
-state.aov=anova(ER.model,ARD.model,SYM.model,Irr1.model,Irr2.model)
-round(state.aov$weight,2)
-
-## plot
-plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
-
-## try without root
-ARD.model.null=fitMk(set$phy,state,model="ARD") 
-plot(ARD.model.null,width=T,color=T,offset=0.1,tol=0)
-
-## simmap
-state.simmap=simmap(state.aov,nsim=100)
-
-## summarize
-simsum=summary(state.simmap)
-
-## set colors and plot
-cols=setNames(viridisLite::viridis(n=2),levels(set$data$synroot)) 
-plot(simsum,ftype="i", fsize=0.7,colors=cols,cex=0.5)
-
-## get density
-state.density=density(state.simmap)
-
-## plot
-par(mfrow=c(1,2),mar=c(4.5,4.5,0.5,0.5))
-COLS<-setNames(cols,state.density$trans) 
-plot(state.density,transition=names(COLS)[1],colors=COLS[1],main="") 
-mtext("a) transitions to anthropogenic roosting",line=-1) 
-
-## other
-plot(state.density,transition=names(COLS)[2],colors=COLS[2], main="") 
-mtext("b) transitions to natural roosting", line=-1,adj=0)
-
-## density map
-state.densityMap=densityMap(state.simmap, plot=FALSE,res=10) 
-
-## plot
-state.densityMap=setMap(state.densityMap, viridisLite::viridis(n=10)) 
-par(mfrow=c(1,1),mar=c(0.5,0.5,0.5,0.5))
-plot(state.densityMap,lwd=2,outline=F,ftype="off",type="fan")
-
-## add nodes
-nodelabels(pie=simsum$ace,piecol=cols,cex=0.3)
-
-## taxonomy
-set$data$taxonomy=paste(set$data$fam,set$data$gen,set$data$Species,sep='; ')
-
-## set taxonomy
-taxonomy=data.frame(set$data$taxonomy)
-names(taxonomy)="taxonomy"
-taxonomy$Species=rownames(set$data)
-taxonomy=taxonomy[c("Species","taxonomy")]
-taxonomy$taxonomy=as.character(taxonomy$taxonomy)
+mod1=phylo.d(set,binvar=Synurbic,permut=1000); mod1
+set.seed(1)
+mod2=phylo.d(cdata,binvar=Synurbic_pseudo,permut=1000); mod2
 
 ## Holm rejection procedure
 HolmProcedure <- function(pf,FWER=0.05){
   
   ## get split variable
   cs=names(coef(pf$models[[1]]))[-1]
-  split=ifelse(length(cs)>1,cs[3],cs[1])
+  split=ifelse(length(cs)>2,cs[3],cs[1])
   
   ## obtain p values
   if (pf$models[[1]]$family$family%in%c('gaussian',"Gamma","quasipoisson")){
@@ -170,8 +118,8 @@ cladeget=function(pf,factor){
 pfsum=function(pf){
   
   ## get formula
-  #chars=as.character(pf$frmla.phylo)[-1]
-  chars=strsplit(as.character(pf$frmla.phylo)," ~ ")[[1]]
+  chars=as.character(pf$frmla.phylo)[-1]
+  #chars=strsplit(as.character(pf$frmla.phylo)," ~ ")[[1]]
   
   ## response
   resp=chars[1]
@@ -239,21 +187,27 @@ pfsum=function(pf){
   return(list(set=dat,results=results))
 }
 
-## binary
+## binary, adjust for log1p citations
 set.seed(1)
 bpf=gpf(Data=set$data,tree=set$phy,
-        frmla.phylo=Synurbic~phylo,
-        family=binomial,algorithm='phylo',nfactors=3)
+        frmla.phylo=Synurbic~phylo+logcites,
+        family=binomial,algorithm='phylo',nfactors=3,min.group.size=10)
 
 ## summarize
 bpf_results=pfsum(bpf)$results
 
-## save
-set$data$status=factor(set$data$Synurbic)
+## repeat for pseudo
+set.seed(1)
+bpf2=gpf(Data=cdata$data,tree=cdata$phy,
+        frmla.phylo=Synurbic_pseudo~phylo+logcites,
+        family=binomial,algorithm='phylo',nfactors=3,min.group.size=10)
+
+## summarize
+bpf2_results=pfsum(bpf2)$results
 
 ## save tree
-set$data$label=set$data$species
 dtree=treeio::full_join(as.treedata(set$phy),set$data,by="label")
+dtree2=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")
 
 ## fix palette
 AlberPalettes <- c("YlGnBu","Reds","BuPu", "PiYG")
@@ -271,8 +225,8 @@ plus=1
 pplus=plus+1
 
 ## ggtree
-gg=ggtree(dtree,size=0.2,colour="grey30")+
-  geom_tippoint(aes(x=x+0.5,colour=status),shape=15,size=1)+
+gg=ggtree(dtree,size=0.2,colour="grey30",layout="fan")+
+  geom_tippoint(aes(x=x+0.5,colour=status),shape=16,size=0.5)+
   scale_colour_manual(values=c("grey80","black"))+
   theme(legend.position = "None")
 
@@ -296,3 +250,86 @@ for(i in 1:nrow(bpf_results)){
     #                 angle=90)
 }
 bgg=gg
+
+## repeat for pseudo
+gg=ggtree(dtree2,size=0.2,colour="grey30",layout="fan")+
+  geom_tippoint(aes(x=x+0.5,colour=status),shape=16,size=0.5)+
+  scale_colour_manual(values=c("grey80","black"))+
+  theme(legend.position = "None")
+
+## add clades
+for(i in 1:nrow(bpf2_results)){
+  
+  gg=gg+
+    geom_hilight(node=bpf2_results$node[i],
+                 alpha=0.25,
+                 fill=ifelse(bpf2_results$clade>
+                               bpf2_results$other,pcols[2],pcols[1])[i])
+  # geom_cladelabel(node=bpf_results$node[i],
+  #                 label=bpf_results$taxa[i],
+  #                 offset=pplus,
+  #                 hjust=0.5,
+  #                 offset.text=pplus*1.25,
+  #                 parse=T,
+  #                 angle=90)
+}
+bgg2=gg
+
+## extract states
+state=setNames(set$data$status,rownames(set$data))
+
+## set prior on root node as non-anthropogenic
+rootn=c(1,0)
+names(rootn)=levels(set$data$status)
+
+## fit models
+ER.model=fitMk(set$phy,state,model="ER",pi=as.matrix(rootn)) 
+ARD.model=fitMk(set$phy,state,model="ARD",pi=as.matrix(rootn)) 
+SYM.model=fitMk(set$phy,state,model="SYM",pi=as.matrix(rootn)) 
+Irr.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
+                 pi=as.matrix(rootn)) 
+
+## model comparison
+state.aov=anova(ER.model,ARD.model,SYM.model,Irr.model)
+round(state.aov$weight,2)
+
+## delta
+state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
+state.aov$delta=state.aov$AIC-state.aov$AIC[1]
+
+## plot
+plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
+
+## simmap
+state.simmap=simmap(state.aov,nsim=10)
+
+## summarize
+simsum=summary(state.simmap)
+
+## set colors and plot
+cols=setNames(viridisLite::viridis(n=2),levels(set$data$synroot)) 
+plot(simsum,ftype="i", fsize=0.7,colors=cols,cex=0.5)
+
+## get density
+state.density=density(state.simmap)
+
+## plot
+par(mfrow=c(1,2),mar=c(4.5,4.5,0.5,0.5))
+COLS<-setNames(cols,state.density$trans) 
+plot(state.density,transition=names(COLS)[1],colors=COLS[1],main="") 
+mtext("a) transitions to anthropogenic roosting",line=-1) 
+
+## other
+plot(state.density,transition=names(COLS)[2],colors=COLS[2], main="") 
+mtext("b) transitions to natural roosting", line=-1,adj=0)
+
+## density map
+state.densityMap=densityMap(state.simmap, plot=FALSE,res=20) 
+
+## plot
+state.densityMap=setMap(state.densityMap, viridisLite::viridis(n=10)) 
+par(mfrow=c(1,1),mar=c(0.5,0.5,0.5,0.5))
+plot(state.densityMap,lwd=1,outline=F,ftype="off",type="fan")
+
+## add nodes
+nodelabels(pie=simsum$ace,piecol=cols,cex=0.3)
