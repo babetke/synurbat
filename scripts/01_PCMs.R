@@ -260,7 +260,7 @@ asr_plot=ggraph(g, layout="linear")+
   theme(legend.position = "none")
 
 ## simmap
-state.simmap=simmap(state.aov,nsim=100)
+state.simmap=simmap(state.aov,nsim=1000)
 
 ## summarize
 simsum=summary(state.simmap,plot=F)
@@ -276,7 +276,6 @@ asrs=asrs[!is.na(asrs$node),]
 
 ## save tree
 dtree=treeio::full_join(as.treedata(set$phy),set$data,by="label")
-dtree2=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")
 
 ## join with asrs
 dtree=treeio::full_join(dtree,asrs,by="node")
@@ -317,3 +316,126 @@ setwd("~/Desktop")
 png("test.png",width=4,height=5,units="in",res=300)
 asr_tree+asr_plot+plot_layout(ncol=1, heights=c(3,1))
 dev.off()
+
+## repeat for pseudoabsence dataset
+cdata$data$status=as.character(cdata$data$Synurbic_pseudo)
+
+## extract states for known status
+state=setNames(cdata$data$status,rownames(cdata$data))
+
+## set prior on root node as non-anthropogenic
+rootn=c(1,0)
+names(rootn)=levels(cdata$data$status)
+
+## fit models
+ER.model=fitMk(cdata$phy,state,model="ER",pi=as.matrix(rootn)) 
+ARD.model=fitMk(cdata$phy,state,model="ARD",pi=as.matrix(rootn)) 
+Irr.model=fitMk(cdata$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
+                pi=as.matrix(rootn)) 
+
+## model comparison
+state.aov=anova(ER.model,ARD.model,Irr.model)
+
+## delta
+state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
+state.aov$delta=state.aov$AIC-state.aov$AIC[1]
+round(state.aov,2)
+
+## plot
+plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
+
+## plot in ggplot
+qm=as.Qmatrix(ARD.model)
+qm=matrix(as.numeric(qm),
+          ncol=length(ARD.model$states),
+          nrow=length(ARD.model$states))
+rownames(qm)=ARD.model$states
+colnames(qm)=ARD.model$states
+diag(qm)=NA
+
+## make edges
+edges=data.frame(from=rev(ARD.model$states),
+                 to=(ARD.model$states),
+                 rate=qm[!is.na(qm)])
+
+## convert to network with meta
+g=graph_from_data_frame(edges,directed=T)
+V(g)$name=c("anthropogenic","natural")
+E(g)$rates=paste0(round(edges$rate,2))
+E(g)$type=c("natural","anthropogenic")
+
+## plot
+asr_plot=ggraph(g, layout="linear")+
+  geom_edge_arc(aes(edge_width=rate,
+                    label=rates,
+                    colour=type),
+                label_dodge=unit(-5,'mm'),
+                strength=0.65,
+                label_size=2.5,
+                angle_calc='along',
+                arrow=arrow(length=unit(3,'mm')),
+                start_cap=square(15,'mm'),
+                end_cap=square(15,'mm'))+
+  #geom_node_point(size=30,shape=16)+
+  geom_node_text(aes(label=name,
+                     colour=name),
+                 size=2.5,fontface="bold",
+                 nudge_x = c(0.06,-0.02))+
+  scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
+  scale_edge_width_continuous(range=c(0.25,1.5))+
+  scale_edge_color_manual(values=rev(c("palegreen3","wheat4")))+
+  theme_void()+
+  theme(legend.position = "none")
+
+## simmap
+state.simmap=simmap(state.aov,nsim=100)
+
+## summarize
+simsum=summary(state.simmap,plot=F)
+
+## get states
+top_prob=data.frame(simsum$ace)
+names(top_prob)=c("neg","pos")
+
+## make tibble
+asrs=tibble(node=as.numeric(rownames(top_prob)),
+            asr=top_prob$pos)
+asrs=asrs[!is.na(asrs$node),]
+
+## save tree
+dtree=treeio::full_join(as.treedata(cdata$phy),set$data,by="label")
+
+## join with asrs
+dtree=treeio::full_join(dtree,asrs,by="node")
+
+## circular tree for known data, with colors
+circ=ggtree(dtree, layout="circular",aes(colour=asr),size=0.25)+
+  scale_colour_gradient(low="palegreen3",high="wheat4")+
+  guides(colour="none")
+
+## add raw data into heatmap
+tdat=as.data.frame(cdata$data$Synurbic_pseudo)
+rownames(tdat)=cdata$phy$tip.label
+asr_tree=gheatmap(circ,tdat,offset=0.1,width=0.05,colnames=F,
+                  low="palegreen3",high="wheat4")+
+  theme(legend.position = "none")
+
+## add phylofactor
+asr_tree=asr_tree+
+  geom_hilight(node=bpf2_results$node[1],
+               alpha=0.5,fill="grey90")+
+  geom_hilight(node=bpf2_results$node[2],
+               alpha=0.5,fill="grey90")
+
+## label
+asr_tree=asr_tree+
+  geom_cladelabel(node=bpf2_results$node[1],
+                  label="Pteropodidae", 
+                  offset=5, offset.text = 5,
+                  angle=-75, fontsize = 2)+
+  geom_cladelabel(node=bpf2_results$node[2],
+                  label="sub-Phyllostomidae", 
+                  offset=5, offset.text = 5,
+                  angle=45, fontsize = 2)
+
+## combine with ASR
