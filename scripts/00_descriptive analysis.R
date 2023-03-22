@@ -3,6 +3,9 @@
 # traits only RDS
 datat <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.rds")
 
+## simple family tweak for now
+datat$fam = ifelse(datat$gen == "Miniopterus", "MINIOPTERIDAE", datat$fam)
+
 # Few family plots
 ggplot(datat, aes(fam, fill = Synurbic)) + 
   #geom_crossbar(aes(ymin = avg-rse, ymax = avg+rse), alpha = 0.5) +
@@ -46,7 +49,7 @@ n_fam = merge(n_fam, tab[c("family", "frac", "missing")], by = "family")
 rm(tab)
 
 ## reorder
-n_fam = n_fam[order(n_fam$missing, n_fam$sample, decreasing=T),]
+n_fam = n_fam[order(n_fam$frac, decreasing=F),]
 n_fam$family = factor(n_fam$family, levels = as.character(n_fam$family))
 
 ## set levels in datat
@@ -64,8 +67,3 @@ ggplot(datat, aes(family)) +
             aes(x = family,
                 y = 1.05,
                 label = sample), size = 3)
-
-
-
-
-
