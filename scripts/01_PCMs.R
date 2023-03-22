@@ -17,13 +17,16 @@ library(ggtree)
 library(car)
 library(phylofactor)
 library(phytools)
+library(igraph)
+library(ggraph)
+library(tibble)
 
 ## load in roosting data
 setwd("~/Desktop/synurbat/flat files")
 data=readRDS("synurbic and traits only.rds")
 
 ## load in Upham phylogeny
-setwd("~/Desktop/bathaus/phylos")
+setwd("~/Desktop/synurbat/phylos")
 tree=read.nexus('MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre')
 
 ## fix tip
@@ -184,82 +187,12 @@ bpf_results=pfsum(bpf)$results
 set.seed(1)
 bpf2=gpf(Data=cdata$data,tree=cdata$phy,
         frmla.phylo=Synurbic_pseudo~phylo+cites,
-        family=binomial,algorithm='phylo',nfactors=3,min.group.size=10)
+        family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
 
 ## summarize
 bpf2_results=pfsum(bpf2)$results
 
-## save tree
-dtree=treeio::full_join(as.treedata(set$phy),set$data,by="label")
-dtree2=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")
-
-## fix palette
-AlberPalettes <- c("YlGnBu","Reds","BuPu", "PiYG")
-AlberColours <- sapply(AlberPalettes, function(a) RColorBrewer::brewer.pal(5, a)[4])
-afun=function(x){
-  a=AlberColours[1:x]
-  return(a)
-}
-
-## make low and high
-pcols=afun(2)
-
-## set x max
-plus=1
-pplus=plus+1
-
-## ggtree
-gg=ggtree(dtree,size=0.2,colour="grey30",layout="fan")+
-  geom_tippoint(aes(x=x+0.5,colour=status),shape=16,size=0.5)+
-  scale_colour_manual(values=c("grey80","black"))+
-  theme(legend.position = "None")
-
-## reset pplus
-pplus=1.5
-
-## add clades
-for(i in 1:nrow(bpf_results)){
-  
-  gg=gg+
-    geom_hilight(node=bpf_results$node[i],
-                 alpha=0.25,
-                 fill=ifelse(bpf_results$clade>
-                               bpf_results$other,pcols[2],pcols[1])[i])
-    # geom_cladelabel(node=bpf_results$node[i],
-    #                 label=bpf_results$taxa[i],
-    #                 offset=pplus,
-    #                 hjust=0.5,
-    #                 offset.text=pplus*1.25,
-    #                 parse=T,
-    #                 angle=90)
-}
-bgg=gg
-
-## repeat for pseudo
-gg=ggtree(dtree2,size=0.2,colour="grey30",layout="fan")+
-  geom_tippoint(aes(x=x+0.5,colour=status),shape=16,size=0.5)+
-  scale_colour_manual(values=c("grey80","black"))+
-  theme(legend.position = "None")
-
-## add clades
-for(i in 1:nrow(bpf2_results)){
-  
-  gg=gg+
-    geom_hilight(node=bpf2_results$node[i],
-                 alpha=0.25,
-                 fill=ifelse(bpf2_results$clade>
-                               bpf2_results$other,pcols[2],pcols[1])[i])
-  # geom_cladelabel(node=bpf_results$node[i],
-  #                 label=bpf_results$taxa[i],
-  #                 offset=pplus,
-  #                 hjust=0.5,
-  #                 offset.text=pplus*1.25,
-  #                 parse=T,
-  #                 angle=90)
-}
-bgg2=gg
-
-## extract states
+## extract states for known status
 state=setNames(set$data$status,rownames(set$data))
 
 ## set prior on root node as non-anthropogenic
@@ -270,7 +203,7 @@ names(rootn)=levels(set$data$status)
 ER.model=fitMk(set$phy,state,model="ER",pi=as.matrix(rootn)) 
 ARD.model=fitMk(set$phy,state,model="ARD",pi=as.matrix(rootn)) 
 Irr.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
-                 pi=as.matrix(rootn)) 
+                pi=as.matrix(rootn)) 
 
 ## model comparison
 state.aov=anova(ER.model,ARD.model,Irr.model)
@@ -283,11 +216,54 @@ round(state.aov,2)
 ## plot
 plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
 
+## plot in ggplot
+qm=as.Qmatrix(ARD.model)
+qm=matrix(as.numeric(qm),
+          ncol=length(ARD.model$states),
+          nrow=length(ARD.model$states))
+rownames(qm)=ARD.model$states
+colnames(qm)=ARD.model$states
+diag(qm)=NA
+
+## make edges
+edges=data.frame(from=rev(ARD.model$states),
+                 to=(ARD.model$states),
+                 rate=qm[!is.na(qm)])
+
+## convert to network with meta
+g=graph_from_data_frame(edges,directed=T)
+V(g)$name=c("anthropogenic","natural")
+E(g)$rates=paste0(round(edges$rate,2))
+E(g)$type=c("natural","anthropogenic")
+
+## plot
+asr_plot=ggraph(g, layout="linear")+
+  geom_edge_arc(aes(edge_width=rate,
+                    label=rates,
+                    colour=type),
+                label_dodge=unit(-5,'mm'),
+                strength=0.65,
+                label_size=2.5,
+                angle_calc='along',
+                arrow=arrow(length=unit(3,'mm')),
+                start_cap=square(15,'mm'),
+                end_cap=square(15,'mm'))+
+  #geom_node_point(size=30,shape=16)+
+  geom_node_text(aes(label=name,
+                     colour=name),
+                 size=2.5,fontface="bold",
+                 nudge_x = c(0.06,-0.02))+
+  scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
+  scale_edge_width_continuous(range=c(0.25,1.5))+
+  scale_edge_color_manual(values=rev(c("palegreen3","wheat4")))+
+  theme_void()+
+  theme(legend.position = "none")
+
 ## simmap
-state.simmap=simmap(state.aov,nsim=5)
+state.simmap=simmap(state.aov,nsim=100)
 
 ## summarize
-simsum=summary(state.simmap,plot=T)
+simsum=summary(state.simmap,plot=F)
 
 ## get states
 top_prob=data.frame(simsum$ace)
@@ -298,90 +274,46 @@ asrs=tibble(node=as.numeric(rownames(top_prob)),
             asr=top_prob$pos)
 asrs=asrs[!is.na(asrs$node),]
 
+## save tree
+dtree=treeio::full_join(as.treedata(set$phy),set$data,by="label")
+dtree2=treeio::full_join(as.treedata(cdata$phy),cdata$data,by="label")
+
 ## join with asrs
-test=treeio::full_join(dtree,asrs,by="node")
+dtree=treeio::full_join(dtree,asrs,by="node")
 
-## repeat ggtree
-gg=ggtree(test,size=0.2,colour="grey30",layout="fan")+
-  geom_tippoint(aes(x=x+0.5,colour=Synurbic),shape=16,size=1)+
-  scale_colour_gradient(low="white",high="black")+
-  #scale_colour_manual(values=c("grey80","black"))+
-  #scale_fill_manual(values=c("grey80","black"))+
-  theme(legend.position = "None")+
-  geom_nodepoint(aes(colour=asr),shape=16,size=2)
-
-## or plot nodes-as-branches? unsure if working
-ggtree(test,aes(colour=asr),size=0.5,layout="fan")+
-  #scale_colour_viridis_c(option="E")+
+## circular tree for known data, with colors
+circ=ggtree(dtree, layout="circular",aes(colour=asr),size=0.25)+
   scale_colour_gradient(low="palegreen3",high="wheat4")+
-  
-  ## overlay phylofactor
+  guides(colour="none")
+
+## add raw data into heatmap
+tdat=as.data.frame(set$data$Synurbic)
+rownames(tdat)=set$phy$tip.label
+asr_tree=gheatmap(circ,tdat,offset=0.1,width=0.05,colnames=F,
+                  low="palegreen3",high="wheat4")+
+  theme(legend.position = "none")
+
+## add phylofactor
+asr_tree=asr_tree+
   geom_hilight(node=bpf_results$node[1],
                alpha=0.5,fill="grey90")+
   geom_hilight(node=bpf_results$node[2],
-               alpha=0.5,fill="grey90")+
-  
-  ## raw 0/1 data
-  #geom_nodepoint(aes(colour=asr),size=2)+
-  geom_tippoint(aes(colour=Synurbic),size=0.5, hjust=1)
+               alpha=0.5,fill="grey90")
 
-## try as heatmap
-circ=ggtree(test, layout="circular",aes(colour=asr))+
-  scale_colour_gradient(low="palegreen3",high="wheat4")
-tdat=as.data.frame(set$data$Synurbic)
-rownames(tdat)=set$phy$tip.label
-gheatmap(circ,tdat,offset=0.1,width=0.05,colnames=F)+
-  scale_colour_gradient(low="palegreen3",high="wheat4")
+## label
+asr_tree=asr_tree+
+  geom_cladelabel(node=bpf_results$node[1],
+                  label="Pteropodidae", 
+                  offset=5, offset.text = 5,
+                  angle=-75, fontsize = 2)+
+  geom_cladelabel(node=bpf_results$node[2],
+                  label="Noctilionoidea", 
+                  offset=5, offset.text = 5,
+                  angle=45, fontsize = 2)
 
-## set colors and plot
-cols=setNames(viridisLite::viridis(n=2),levels(set$data$synroot)) 
-plot(simsum,ftype="i", fsize=0.7,colors=cols,cex=0.5)
-
-## get density
-state.density=density(state.simmap)
-
-## plot
-par(mfrow=c(1,2),mar=c(4.5,4.5,0.5,0.5))
-COLS<-setNames(cols,state.density$trans) 
-plot(state.density,transition=names(COLS)[1],colors=COLS[1],main="") 
-mtext("a) transitions to anthropogenic roosting",line=-1) 
-
-## other
-plot(state.density,transition=names(COLS)[2],colors=COLS[2], main="") 
-mtext("b) transitions to natural roosting", line=-1,adj=0)
-
-## density map
-state.densityMap=densityMap(state.simmap, plot=FALSE,res=20) 
-
-## plot
-vids=viridisLite::viridis(n=10)
-state.densityMap=setMap(state.densityMap, viridisLite::viridis(n=10)) 
-par(mfrow=c(1,1),mar=c(0.5,0.5,0.5,0.5))
-plot(state.densityMap,lwd=1,outline=F,ftype="off",type="fan")
-
-## add nodes
-nodelabels(pie=simsum$ace,piecol=cols,cex=0.3)
-
-## extract states for pseudo
-state=setNames(factor(cdata$data$Synurbic_pseudo),rownames(cdata$data))
-
-## set prior on root node as non-anthropogenic
-rootn=c(1,0)
-names(rootn)=levels(factor(cdata$data$Synurbic_pseudo))
-
-## fit models
-ER.model=fitMk(cdata$phy,state,model="ER",pi=as.matrix(rootn)) 
-ARD.model=fitMk(cdata$phy,state,model="ARD",pi=as.matrix(rootn)) 
-Irr.model=fitMk(cdata$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
-                pi=as.matrix(rootn)) 
-
-## model comparison
-state.aov=anova(ER.model,ARD.model,Irr.model)
-
-## delta
-state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
-state.aov$delta=state.aov$AIC-state.aov$AIC[1]
-round(state.aov,2)
-
-## summary
-plot(ARD.model)
+## combine plots
+library(patchwork)
+setwd("~/Desktop")
+png("test.png",width=4,height=5,units="in",res=300)
+asr_tree+asr_plot+plot_layout(ncol=1, heights=c(3,1))
+dev.off()
