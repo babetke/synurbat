@@ -20,34 +20,23 @@ library(phytools)
 
 ## load in roosting data
 setwd("~/Desktop/synurbat/flat files")
-data=read.csv("Bat References Spreadsheet.csv")
-
-## load in taxonomy
-setwd("~/Desktop/bathaus/phylos")
-taxa=read.csv('taxonomy_mamPhy_5911species.csv',header=T)
-taxa=taxa[taxa$ord=="CHIROPTERA",]
-taxa$tip=taxa$Species_Name
-taxa$species=sapply(strsplit(taxa$tip,'_'),function(x) paste(x[1],x[2],sep=' '))
-
-## merge data and taxa by species
-data=merge(data,taxa[c("species","fam","gen","clade","extinct.","tiplabel")],by="species")
-rm(taxa)
-
-## remove extinct
-data=data[!data$extinct.==1,]
-data$extinct.=NULL
+data=readRDS("synurbic and traits only.rds")
 
 ## load in Upham phylogeny
+setwd("~/Desktop/bathaus/phylos")
 tree=read.nexus('MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre')
 
-## trim phylo to bats
-tree=keep.tip(tree,data$tiplabel)
-
 ## fix tip
-tree$tip.label=sapply(strsplit(tree$tip.label,'_'),function(x) paste(x[1],x[2],sep=' '))
+tree$tip.label=sapply(strsplit(tree$tip.label,'_'),function(x) paste(x[1],x[2],sep='_'))
+
+## trim phylo to bats
+tree=keep.tip(tree,data$tip)
 
 ## make label
-data$label=data$species
+data$label=data$tip
+
+## fix family
+data$fam = ifelse(data$gen == "Miniopterus", "MINIOPTERIDAE", data$fam)
 
 ## merge
 cdata=comparative.data(phy=tree,data=data,names.col=label,vcv=T,na.omit=F,warn.dropped=T)
@@ -60,12 +49,6 @@ cdata$data$Synurbic_pseudo=ifelse(is.na(cdata$data$Synurbic),0,cdata$data$Synurb
 
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
-
-## log1p citations
-hist(cdata$data$cites)
-hist(log1p(cdata$data$cites))
-hist(sqrt(cdata$data$cites))
-cdata$data$logcites=log1p(cdata$data$cites)
 
 ## save status and label
 cdata$data$status=factor(cdata$data$Synurbic)
