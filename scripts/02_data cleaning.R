@@ -1,4 +1,3 @@
-# data cleaning
 # Data cleaning and trait coverage for BRT analysis
 # babetke@utexas.edu
 
@@ -11,10 +10,10 @@ library(tidyverse)
 library(fastDummies) # dummy coding family
 
 ### Read in data
-zoonotic <- read_csv("~/Desktop/Bats and Viruses/bathaus/flat files/zoonotic virus to merged PanTHERIA.csv")
+zoonotic <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/zoonotic virus to merged PanTHERIA.csv")
 
 # merge updated synurbic data if needed
-update <- read_csv("~/Desktop/Bat References Spreadsheet feb16.csv") %>%
+update <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/Bat References Spreadsheet.csv") %>%
   select(species, Synurbic, Complete)# pull from google drive
 
 # check for complete - finished data should be only Yes
@@ -22,26 +21,17 @@ table(update$Complete)
 
 # names of bats that are left to revisit - should return nothing when revisits are done
 update[update$Complete == "revisit",]$species
-# [1] "Lonchophylla chocoana"       "Lonchophylla concava"        "Lonchophylla orcesi"        
-# [4] "Lonchophylla orienticollina" "Lonchophylla peracchii"      "Lonchophylla robusta"       
-# [7] "Lonchophylla thomasi"        "Lonchorhina fernandezi"      "Lonchorhina inusitata"      
-# [10] "Lophostoma aequatorialis"    "Lophostoma schulzi"          "Megaerops niphanae"         
-# [13] "Megaerops wetmorei"          "Micronycteris matses"        "Micronycteris schmidtorum"  
-# [16] "Micronycteris yatesi"        "Miniopterus mossambicus"     "Miniopterus oceanensis"     
-# [19] "Miniopterus schreibersii"    "Molossops aequatorianus"     "Molossops neglectus"        
-# [22] "Nyctophilus timoriensis"     "Pipistrellus deserti"        "Pipistrellus imbricatus"   
 
 # merge updated synurbic data
 merged <- merge(zoonotic, update, by = "species", all = TRUE)
 
 merged %>%
   rename(Synurbic = Synurbic.y,
-         Complete = Complete.y,
-         cites = cites.y) %>%
-  select(!c(Synurbic.x, Complete.x, cites.x)) -> merged
+         Complete = Complete.y) %>%
+  select(!c(Synurbic.x, Complete.x)) -> merged
 
 # you also need to remove the extinct bats - read in taxonomy
-tax <- read_csv("~/Desktop/Bats and Viruses/bathaus/phylos/taxonomy_mamPhy_5911species.csv")
+tax <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/taxonomy_mamPhy_5911species.csv")
 
 # How many bats are extinct?
 names <- tax[tax$ord == "CHIROPTERA" & tax$extinct. == 1, ]$Species_Name
@@ -52,18 +42,17 @@ names <- sub("_", " ", names)
 
 # remove the extinct bats
 data <- filter(merged, !species %in% names)
-rm(zoonotic, update, merged, tax)
+rm(zoonotic, update, merged, tax, names)
 
 # glimpse and see variables
 glimpse(data)
+colnames(data)
 
 # remove the virus cols
 data <- data %>% 
-  select(-c("virus","vcites","vfilter","filter","zvirus", `Type of anth roosting structure`:...17))
+  select(-c("virus","vcites","vfilter","filter","zvirus"))
 
-# save just incase we need to share (move to after dums if you want them included)
-write_csv(data, "/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.csv")
-
+#### Dummy Families
 ## make binary columns for genus
 dums <- dummy_cols(data["fam"])
 
@@ -79,7 +68,20 @@ dums <- dums %>%
 data <- merge(data,dums,by="fam",all.x=T)
 rm(dums)
 
-# Factor COMBINE and remove unnecessary columns
+##### break up Biogeographical realms
+temp <- data[c("species","biogeographical_realm")] 
+
+temp_wide <- temp %>%
+  separate_rows(biogeographical_realm, sep = ", ") %>%
+  drop_na() %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = biogeographical_realm, values_from = value, values_fill = 0) %>%
+  mutate(across(where(is.numeric), factor))
+
+data <- merge(data, temp_wide, by = "species", all = TRUE)
+rm(temp, temp_wide)
+
+#### Factor COMBINE and remove unnecessary columns
 data <- data %>% # Synurbic and variables that are factors according to COMBINE
   mutate(across(c("Synurbic","hibernation_torpor","fossoriality","trophic_level",
                   "foraging_stratum","activity_cycle", "freshwater", 
@@ -88,8 +90,12 @@ data <- data %>% # Synurbic and variables that are factors according to COMBINE
                 factor)) %>% 
   select(-c("MSW3_sciName_matched"))
 
-colnames(data) # 95 columns
+length(colnames(data)) # 102 columns
 
+# save before trimming
+saveRDS(data, "/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.rds")
+
+#### Clean out variables with low variance and coverage
 # Variation
 ## mode function
 mode.prop <- function(x) {
@@ -114,13 +120,13 @@ vars <- vars[order(vars$keep),]
 
 table(vars$keep)
 # cut keep 
-# 17   73 
+# 18   80
 
 ## trim
 keeps <- vars[-which(vars$keep=="cut"),]$column
 
 ## drop if no variation
-data <-data[keeps]
+data <- data[keeps]
 rm(keeps,vars)
 
 ## assess missing values
@@ -148,7 +154,7 @@ dev.off()
 mval$keep=ifelse(mval$comp>=0.30,"keep","cut")
 table(mval$keep)
 # cut keep 
-# 18   63
+# 18   66 
 
 ## order
 mval=mval[order(mval$comp),]
@@ -166,10 +172,7 @@ coverage_table <- mval %>%
 rownames(coverage_table) <- NULL
 
 # save as csv
-#write.csv(coverage_table, "ESA Poster/figs/coverage_table.csv", row.names = FALSE)
-
-# Write to .txt
-#write.table(coverage_table, file = "ESA Poster/figs/coverage_table.txt", sep = ",", quote = FALSE, row.names = F)
+# write.csv(coverage_table, "ESA Poster/figs/coverage_table.csv", row.names = FALSE)
 
 ## drop if not well represented
 data=data[keeps]
@@ -181,13 +184,13 @@ data <- data %>%
 
 colnames(data) # resulting in 55 variables total, 51 covariates
 
-# change to pseudoabs col for synurbic where all NAs are equal to 0
+# change to pseudoabs for synurbic where all NAs are equal to 0
 data <- data %>%
   mutate(pseudo = replace_na(Synurbic, "0")) 
 glimpse(data)
 
-# reordering so spcies and response variables are in front
+# reordering so species and response variables are in front
 data %>% select(species, Synurbic, pseudo, cites, everything()) -> data
 
-# Write as csv
-write.csv(data, "/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.csv", row.names = FALSE)
+# Save as RDS
+saveRDS(data, "/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.rds")

@@ -1,4 +1,4 @@
-# BRT analysis - Determinants of anthropogenic roosting
+# BRT analysis - Trait determinants of anthropogenic roosting
 # babetke@utexas.edu
 
 # Script for data cleaning
@@ -13,47 +13,56 @@ library(ROCR)
 library(caret) 
 library(InformationValue)
 
-# read in data (do I want a separate file for data processing?)
-data <- read_csv("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.csv")
+# read in data 
+# data <- read_csv("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.csv") Directory for personal comp
+# data <- read_csv("/Volumes/BETKE 2021/synurbat/flat files/cleaned dataset 30 cutoff.csv") # directory for lab comp
 
-# data classes didn't hold in the cleaning file (may just want to remove that and factorize here)
-data <- data %>% # Synurbic and variables that are factors according to COMBINE
-  mutate(across(c("trophic_level","foraging_stratum","activity_cycle",
-                  "disected_by_mountains", "glaciation", "biogeographical_realm","fam_EMBALLONURIDAE":"fam_VESPERTILIONIDAE"), 
-                factor))
+# data classes didn't hold in the cleaning file (may just want to remove that and factorize here OR save as RDS and read in here)
+# data <- data %>% # Synurbic and variables that are factors according to COMBINE
+#   mutate(across(c("trophic_level","foraging_stratum","activity_cycle",
+#                   "disected_by_mountains", "glaciation", "biogeographical_realm","fam_EMBALLONURIDAE":"fam_VESPERTILIONIDAE"), 
+#                 factor))
+
+# read in rds
+data <- readRDS("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.rds")
 
 # remove species col
-data <- data %>% select(-species) 
+data <- data %>% 
+  select(-c(species, det_inv, biogeographical_realm)) 
 
-# how many NAs are there - 264 as of 02/18/23
+# how many NAs are there - 253
 length(data$Synurbic[is.na(data$Synurbic)])
 
-# I also need a second dataset without NAs in synurbic. NAs cannot be in response
+# make Synurbic numeric (gbm will crash)
+data$Synurbic <- as.numeric(as.character(data$Synurbic))
+data$pseudo <- as.numeric(as.character(data$pseudo))
+
+# dataset without NAs in synurbic. NAs cannot be in response.
 na.data <- data[!is.na(data$Synurbic),]
 
 # Set up BRT tuning via search grid
 # function to make grids?
 ## hyperparameter grid, maybe allow the number of seeds to change?
-makegrid <- function(seed) {
+makegrid <- function(seed,trees) {
   
   # create grid
-  tgrid <- expand.grid(n.trees = seq(5000,15000,5000),
+  tgrid <- expand.grid(n.trees = trees,
                        interaction.depth = c(2,3,4),
                        shrinkage = c(0.01,0.001,0.0005),
                        n.minobsinnode = 4, 
                        seed = seq(1,seed,by = 1))
   
   ## trees, depth, shrink, min, prop
-  tgrid$id=with(tgrid,paste(n.trees,interaction.depth,shrinkage,n.minobsinnode))
+  tgrid$id <- with(tgrid,paste(n.trees,interaction.depth,shrinkage,n.minobsinnode))
   
   ## sort by id then seed
-  tgrid=tgrid[order(tgrid$id,tgrid$seed),]
+  tgrid <- tgrid[order(tgrid$id,tgrid$seed),]
   
   ## now add rows
-  tgrid$row=1:nrow(tgrid)
+  tgrid$row <- 1:nrow(tgrid)
   
   ## factor id
-  tgrid$id2=factor(as.numeric(factor(tgrid$id)))
+  tgrid$id2 <- factor(as.numeric(factor(tgrid$id)))
   
   return(tgrid)
 }
@@ -70,7 +79,7 @@ makegrid <- function(seed) {
 # response <- indicate which response I want to use. Either dum_virus or dum_zvirus
 # folds <- indicating either 10 or 5 folds depending on the dataset (5 for subset of 544 and 10 for full)
 # nsplit <- allow for randomized test and training sets or only data
-hfit=function(row, data_df, response, folds, nsplit){
+grid_search <- function(row, data_df, response, folds, nsplit){
   
   # new data
   ndata <- data_df
@@ -83,29 +92,29 @@ hfit=function(row, data_df, response, folds, nsplit){
   # how to indicate no splits
   nsplit = nsplit
   if(nsplit == "yes"){
-  
-  ## test and train for data
-  dataTrain <- ndata
-  dataTest <- ndata
-  
-  # pull response test and train
-  yTrain <- dataTrain$response
-  yTest <- dataTest$response
-  
+    
+    ## test and train for data
+    dataTrain <- ndata
+    dataTest <- ndata
+    
+    # pull response test and train
+    yTrain <- dataTrain$response
+    yTest <- dataTest$response
+    
   } else {
-  
-  ## use rsample to split (allow the proportion to be changed incase)
-  set.seed(hgrid$seed[row])
-  split=initial_split(ndata,prop=0.7,strata="response")
-  
-  ## test and train
-  dataTrain=training(split)
-  dataTest=testing(split)
-  
-  ## yTest and yTrain
-  yTrain=dataTrain$response
-  yTest=dataTest$response
-      
+    
+    ## use rsample to split (allow the proportion to be changed incase)
+    set.seed(hgrid$seed[row])
+    split=initial_split(ndata,prop=0.7,strata="response")
+    
+    ## test and train
+    dataTrain=training(split)
+    dataTest=testing(split)
+    
+    ## yTest and yTrain
+    yTrain=dataTrain$response
+    yTest=dataTest$response
+    
   }
   
   ## BRT
@@ -155,34 +164,65 @@ hfit=function(row, data_df, response, folds, nsplit){
               wrow=row))
 }
 
-hgrid <- makegrid(1)
+hgrid <- makegrid(1, trees = seq(15000,50000,5000))
+rgrid <- makegrid(1, c(15000, seq(20000, 50000, 10000))) #45, trimmed to not have 5000, or 10000 because they max out on
 
-# trim for now
-hgrid <- hgrid[1,]
-
-spars <- lapply(1:nrow(hgrid),function(x) hfit(x, data_df = na.data, response="Synurbic", folds = 5, nsplit = "yes"))
+# run for the two types of data?
+na.pars <- lapply(1:nrow(hgrid),function(x) hfit(x, data_df = na.data, response="Synurbic", folds = 10, nsplit = "yes"))
+f.pars <- lapply(1:nrow(hgrid),function(x) hfit(x, data_df = data, response="pseudo", folds = 10, nsplit = "yes"))
 
 ## get results
-sresults=data.frame(sapply(spars,function(x) x$trainAUC),
-                    sapply(spars,function(x) x$testAUC),
-                    sapply(spars,function(x) x$spec),
-                    sapply(spars,function(x) x$sen),
-                    sapply(spars,function(x) x$wrow),
-                    sapply(spars,function(x) x$best))
-names(sresults)=c("trainAUC","testAUC",
-                  "spec","sen","row","best")
+na.results <- data.frame(sapply(na.pars,function(x) x$trainAUC),
+                      sapply(na.pars,function(x) x$testAUC),
+                      sapply(na.pars,function(x) x$spec),
+                      sapply(na.pars,function(x) x$sen),
+                      sapply(na.pars,function(x) x$wrow),
+                      sapply(na.pars,function(x) x$best))
+names(na.results) <- c("trainAUC","testAUC",
+                    "spec","sen","row","best")
 
-## combine and save
-vsearch_complete = merge(sresults,hgrid,by="row")
+# Merge with hgrid
+na.complete <- merge(na.results, hgrid, by = "row")
 
-# define BRT function 
+# Plot of parameters
+auc_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = testAUC)) +
+  geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+  theme_classic() +
+  labs(x = "Shrinkage", y = "AUC", fill = "Interaction Depth") +
+  theme(legend.position = "none")
+
+sen_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = sen)) +
+  geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+  theme_classic() +
+  labs(x = "Shrinkage", y = "Sensitivity", fill = "Interaction Depth") +
+  theme(legend.position = "none")
+
+spec_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = spec)) +
+  geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+  theme_classic() +
+  labs(x = "Shrinkage", y = "Specificity", fill = "Interaction Depth")
+
+library(patchwork) # multiplot and save
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/parameters no NAs.png", width=15,height=5,units="in",res=600)
+auc_gg + sen_gg + spec_gg 
+dev.off()
+
+# remove
+rm(auc_gg, sen_gg, spec_gg)
+
+# unload patchwork
+detach("package:patchwork", unload = TRUE)
+
+# write as csv
+write_csv(na.complete, "/Volumes/BETKE 2021/synurbat/flat files/grid search without NAs.csv")
+
+# Define BRT function 
 # take a specified dataset
 # label response
 # maybe build in some options to change the split section - keep from analysis before but maybe add a if else 
 
 # Basic gbm functions from virus analysis - the innerds of partition function w/out partitions 
-set.seed(seed)
-testbrt <- function(data_df, response, nt, shr, int.d) {
+get_brt <- function(data_df, response, nt, shr, int.d, folds, nsplit, seed=NULL) {
   
   # rename dataset
   ndata <- data_df
@@ -191,7 +231,11 @@ testbrt <- function(data_df, response, nt, shr, int.d) {
   ndata <- ndata %>% 
     mutate(response = !!sym(response)) %>%
     select(-c("pseudo", "Synurbic"))
-
+  
+  # how to indicate no splits
+  nsplit = nsplit
+  if(nsplit == "yes"){
+  
   ## test and train for data, same because no splits
   train <- ndata
   test <- ndata
@@ -199,6 +243,22 @@ testbrt <- function(data_df, response, nt, shr, int.d) {
   # pull response test and train
   yTrain <- train$response
   yTest <- test$response
+  
+  } else {
+    
+    ## use rsample to split (allow the proportion to be changed incase)
+    set.seed(seed)
+    split <- initial_split(ndata,prop=0.7,strata="response")
+    
+    ## test and train
+    train <- training(split)
+    test <- testing(split)
+    
+    ## yTest and yTrain
+    yTrain <- train$response
+    yTest <- test$response
+    
+  }
   
   ## parameters from parameter_df - search grid data
   # nt <- params$n.trees
@@ -225,17 +285,10 @@ testbrt <- function(data_df, response, nt, shr, int.d) {
   ## predict with test data
   preds <- predict(gbmOut,test,n.trees=best.iter,type="response")
   
-  ## performance
-  par(mfrow=c(1,1),mar=c(4,4,1,1))
-  best.iter <- gbm.perf(gbmOut,method="cv")
-  
-  ## predict with test data
-  preds <- predict(gbmOut,test,n.trees=best.iter,type="response")
-  
   ## known
   result <- test$response
   
-  ## sensitiviy and specificity
+  ## sensitivity and specificity
   sen <- InformationValue::sensitivity(result,preds)
   spec <- InformationValue::specificity(result,preds)
   
@@ -252,97 +305,25 @@ testbrt <- function(data_df, response, nt, shr, int.d) {
   ## save outputs
   return(list(mod=gbmOut,
               best=best.iter,
+              preds=preds,
               trainAUC=auc_train,
               testAUC=auc_test,
               spec=spec,
               sen=sen,
-              roc=perf,
               rinf=bars,
-              #predict=pred_data,
               traindata=train,
-              testdata=test,
-              seed=seed))
+              testdata=test))
+  
 }
 
-# change name of response
-ndata <- data_df
+# Run BRTs
+noNA_gbm <- get_brt(data_df = na.data, response = "Synurbic", nt = 10000, shr = 0.001, int.d = 4, nsplit = "yes")
+pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 10000, shr = 0.001, int.d = 4, nsplit = "yes")
 
-# correct the response and remove raw response variables
-ndata <- ndata %>% 
-  mutate(response = !!sym(response)) %>%
-  select(-c("virus", "zvirus", "dum_zvirus", "dum_virus"))
+# Save 
+saveRDS(noNA_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")
+saveRDS(pseudo_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/pseudo_brts.rds")
 
-## test and train for data, same because no splits
-train <- ndata
-test <- ndata
 
-# pull response test and train
-yTrain <- train$response
-yTest <- test$response
 
-## parameters from parameter_df - search grid data
-# nt <- params$n.trees
-# shr <- params$shrinkage
-# int.d <- params$interaction.depth
 
-nt <- nt
-shr <- shr
-int.d <- int.d
-
-## BRT
-set.seed(1)
-gbmOut <- gbm(response ~ . ,data=train,
-              n.trees=nt,
-              distribution="bernoulli",
-              shrinkage=shr,
-              interaction.depth=int.d,
-              n.minobsinnode=4,
-              cv.folds=10,class.stratify.cv=TRUE,
-              bag.fraction=0.5,train.fraction=1,
-              n.cores=1,
-              verbose=F)
-
-## performance
-par(mfrow=c(1,1),mar=c(4,4,1,1))
-best.iter <- gbm.perf(gbmOut,method="cv")
-
-## predict with test data
-preds <- predict(gbmOut,test,n.trees=best.iter,type="response")
-
-## performance
-par(mfrow=c(1,1),mar=c(4,4,1,1))
-best.iter <- gbm.perf(gbmOut,method="cv")
-
-## predict with test data
-preds <- predict(gbmOut,test,n.trees=best.iter,type="response")
-
-## known
-result <- test$response
-
-## sensitiviy and specificity
-sen <- InformationValue::sensitivity(result,preds)
-spec <- InformationValue::specificity(result,preds)
-
-## AUC on train
-auc_train <- gbm.roc.area(yTrain,predict(gbmOut,train,n.trees=best.iter,type="response"))
-
-## AUC on test
-auc_test <- gbm.roc.area(yTest,predict(gbmOut,test,n.trees=best.iter,type="response"))
-
-## relative importance
-bars <- summary(gbmOut,n.trees=best.iter,plotit=F)
-bars$rel.inf <- round(bars$rel.inf,2)
-
-## save outputs
-return(list(mod=gbmOut,
-            best=best.iter,
-            trainAUC=auc_train,
-            testAUC=auc_test,
-            spec=spec,
-            sen=sen,
-            roc=perf,
-            rinf=bars,
-            #predict=pred_data,
-            traindata=train,
-            testdata=test,
-            seed=seed))
