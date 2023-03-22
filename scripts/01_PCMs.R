@@ -438,4 +438,9 @@ asr_tree=asr_tree+
                   offset=5, offset.text = 5,
                   angle=45, fontsize = 2)
 
-## combine with ASR
+## combine plots
+library(patchwork)
+setwd("~/Desktop")
+png("test2.png",width=4,height=5,units="in",res=300)
+asr_tree+asr_plot+plot_layout(ncol=1, heights=c(3,1))
+dev.off()
