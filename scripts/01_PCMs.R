@@ -33,7 +33,7 @@ taxa$species=sapply(strsplit(taxa$tip,'_'),function(x) paste(x[1],x[2],sep=' '))
 data=merge(data,taxa[c("species","fam","gen","clade","extinct.","tiplabel")],by="species")
 rm(taxa)
 
-## remove extinc
+## remove extinct
 data=data[!data$extinct.==1,]
 data$extinct.=NULL
 
@@ -190,7 +190,7 @@ pfsum=function(pf){
 ## binary, adjust for log1p citations
 set.seed(1)
 bpf=gpf(Data=set$data,tree=set$phy,
-        frmla.phylo=Synurbic~phylo+logcites,
+        frmla.phylo=Synurbic~phylo+cites,
         family=binomial,algorithm='phylo',nfactors=3,min.group.size=10)
 
 ## summarize
@@ -199,7 +199,7 @@ bpf_results=pfsum(bpf)$results
 ## repeat for pseudo
 set.seed(1)
 bpf2=gpf(Data=cdata$data,tree=cdata$phy,
-        frmla.phylo=Synurbic_pseudo~phylo+logcites,
+        frmla.phylo=Synurbic_pseudo~phylo+cites,
         family=binomial,algorithm='phylo',nfactors=3,min.group.size=10)
 
 ## summarize
@@ -301,7 +301,7 @@ state.aov$delta=state.aov$AIC-state.aov$AIC[1]
 plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
 
 ## simmap
-state.simmap=simmap(state.aov,nsim=10)
+state.simmap=simmap(state.aov,nsim=1000)
 
 ## summarize
 simsum=summary(state.simmap)
