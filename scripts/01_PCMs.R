@@ -42,9 +42,10 @@ data$fam = ifelse(data$gen == "Miniopterus", "MINIOPTERIDAE", data$fam)
 cdata=comparative.data(phy=tree,data=data,names.col=label,vcv=T,na.omit=F,warn.dropped=T)
 
 ## species
-cdata$data$Species=cdata$data$species
+cdata$data$Species=cdata$data$tip
 
 ## make Synurbic with pseudoabsences
+cdata$data$Synurbic=as.numeric(as.character(cdata$data$Synurbic))
 cdata$data$Synurbic_pseudo=ifelse(is.na(cdata$data$Synurbic),0,cdata$data$Synurbic)
 
 ## taxonomy
@@ -52,7 +53,7 @@ cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='
 
 ## save status and label
 cdata$data$status=factor(cdata$data$Synurbic)
-cdata$data$label=cdata$data$species
+cdata$data$label=cdata$data$tip
 
 ## trim to tree with data
 set=cdata[!is.na(cdata$data$Synurbic),]
@@ -174,7 +175,7 @@ pfsum=function(pf){
 set.seed(1)
 bpf=gpf(Data=set$data,tree=set$phy,
         frmla.phylo=Synurbic~phylo+cites,
-        family=binomial,algorithm='phylo',nfactors=3,min.group.size=10)
+        family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
 
 ## summarize
 bpf_results=pfsum(bpf)$results
@@ -268,26 +269,69 @@ names(rootn)=levels(set$data$status)
 ## fit models
 ER.model=fitMk(set$phy,state,model="ER",pi=as.matrix(rootn)) 
 ARD.model=fitMk(set$phy,state,model="ARD",pi=as.matrix(rootn)) 
-SYM.model=fitMk(set$phy,state,model="SYM",pi=as.matrix(rootn)) 
 Irr.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
                  pi=as.matrix(rootn)) 
 
 ## model comparison
-state.aov=anova(ER.model,ARD.model,SYM.model,Irr.model)
-round(state.aov$weight,2)
+state.aov=anova(ER.model,ARD.model,Irr.model)
 
 ## delta
 state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
 state.aov$delta=state.aov$AIC-state.aov$AIC[1]
+round(state.aov,2)
 
 ## plot
 plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
 
 ## simmap
-state.simmap=simmap(state.aov,nsim=1000)
+state.simmap=simmap(state.aov,nsim=5)
 
 ## summarize
-simsum=summary(state.simmap)
+simsum=summary(state.simmap,plot=T)
+
+## get states
+top_prob=data.frame(simsum$ace)
+names(top_prob)=c("neg","pos")
+
+## make tibble
+asrs=tibble(node=as.numeric(rownames(top_prob)),
+            asr=top_prob$pos)
+asrs=asrs[!is.na(asrs$node),]
+
+## join with asrs
+test=treeio::full_join(dtree,asrs,by="node")
+
+## repeat ggtree
+gg=ggtree(test,size=0.2,colour="grey30",layout="fan")+
+  geom_tippoint(aes(x=x+0.5,colour=Synurbic),shape=16,size=1)+
+  scale_colour_gradient(low="white",high="black")+
+  #scale_colour_manual(values=c("grey80","black"))+
+  #scale_fill_manual(values=c("grey80","black"))+
+  theme(legend.position = "None")+
+  geom_nodepoint(aes(colour=asr),shape=16,size=2)
+
+## or plot nodes-as-branches? unsure if working
+ggtree(test,aes(colour=asr),size=0.5,layout="fan")+
+  #scale_colour_viridis_c(option="E")+
+  scale_colour_gradient(low="palegreen3",high="wheat4")+
+  
+  ## overlay phylofactor
+  geom_hilight(node=bpf_results$node[1],
+               alpha=0.5,fill="grey90")+
+  geom_hilight(node=bpf_results$node[2],
+               alpha=0.5,fill="grey90")+
+  
+  ## raw 0/1 data
+  #geom_nodepoint(aes(colour=asr),size=2)+
+  geom_tippoint(aes(colour=Synurbic),size=0.5, hjust=1)
+
+## try as heatmap
+circ=ggtree(test, layout="circular",aes(colour=asr))+
+  scale_colour_gradient(low="palegreen3",high="wheat4")
+tdat=as.data.frame(set$data$Synurbic)
+rownames(tdat)=set$phy$tip.label
+gheatmap(circ,tdat,offset=0.1,width=0.05,colnames=F)+
+  scale_colour_gradient(low="palegreen3",high="wheat4")
 
 ## set colors and plot
 cols=setNames(viridisLite::viridis(n=2),levels(set$data$synroot)) 
@@ -310,9 +354,34 @@ mtext("b) transitions to natural roosting", line=-1,adj=0)
 state.densityMap=densityMap(state.simmap, plot=FALSE,res=20) 
 
 ## plot
+vids=viridisLite::viridis(n=10)
 state.densityMap=setMap(state.densityMap, viridisLite::viridis(n=10)) 
 par(mfrow=c(1,1),mar=c(0.5,0.5,0.5,0.5))
 plot(state.densityMap,lwd=1,outline=F,ftype="off",type="fan")
 
 ## add nodes
 nodelabels(pie=simsum$ace,piecol=cols,cex=0.3)
+
+## extract states for pseudo
+state=setNames(factor(cdata$data$Synurbic_pseudo),rownames(cdata$data))
+
+## set prior on root node as non-anthropogenic
+rootn=c(1,0)
+names(rootn)=levels(factor(cdata$data$Synurbic_pseudo))
+
+## fit models
+ER.model=fitMk(cdata$phy,state,model="ER",pi=as.matrix(rootn)) 
+ARD.model=fitMk(cdata$phy,state,model="ARD",pi=as.matrix(rootn)) 
+Irr.model=fitMk(cdata$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
+                pi=as.matrix(rootn)) 
+
+## model comparison
+state.aov=anova(ER.model,ARD.model,Irr.model)
+
+## delta
+state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
+state.aov$delta=state.aov$AIC-state.aov$AIC[1]
+round(state.aov,2)
+
+## summary
+plot(ARD.model)
