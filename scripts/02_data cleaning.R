@@ -10,27 +10,36 @@ library(tidyverse)
 library(fastDummies) # dummy coding family
 
 ### Read in data
-zoonotic <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/zoonotic virus to merged PanTHERIA.csv")
+zoonotic <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/IUCN data merge to zoonotic.csv")
+
+## check for complete - finished data should be only Yes
+table(zoonotic$Complete)
+
+## checking that PanTHERIA data is updated from -999 to NA
+table(is.na(zoonotic$X26.1_GR_Area_km2))
+
+## names of bats that are left to revisit - should return nothing when revisits are done
+zoonotic[zoonotic$Complete == "revisit",]$species
 
 # merge updated synurbic data if needed
-update <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/Bat References Spreadsheet.csv") %>%
-  select(species, Synurbic, Complete)# pull from google drive
+#update <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/Bat References Spreadsheet.csv") %>%
+  #select(species, Synurbic, Complete)# pull from google drive
 
-# check for complete - finished data should be only Yes
-table(update$Complete)
+# # check for complete - finished data should be only Yes
+# table(update$Complete)
+# 
+# # names of bats that are left to revisit - should return nothing when revisits are done
+# update[update$Complete == "revisit",]$species
+# 
+# # merge updated synurbic data
+# merged <- merge(zoonotic, update, by = "species", all = TRUE)
+# 
+# merged %>%
+#   rename(Synurbic = Synurbic.y,
+#          Complete = Complete.y) %>%
+#   select(!c(Synurbic.x, Complete.x)) -> merged
 
-# names of bats that are left to revisit - should return nothing when revisits are done
-update[update$Complete == "revisit",]$species
-
-# merge updated synurbic data
-merged <- merge(zoonotic, update, by = "species", all = TRUE)
-
-merged %>%
-  rename(Synurbic = Synurbic.y,
-         Complete = Complete.y) %>%
-  select(!c(Synurbic.x, Complete.x)) -> merged
-
-# you also need to remove the extinct bats - read in taxonomy
+## remove the extinct bats - read in taxonomy
 tax <- read_csv("~/Desktop/Synurbic_Bats/synurbat/raw/taxonomy_mamPhy_5911species.csv")
 
 # How many bats are extinct?
@@ -41,8 +50,8 @@ names <- tax[tax$ord == "CHIROPTERA" & tax$extinct. == 1, ]$Species_Name
 names <- sub("_", " ", names)
 
 # remove the extinct bats
-data <- filter(merged, !species %in% names)
-rm(zoonotic, update, merged, tax, names)
+data <- filter(zoonotic, !species %in% names)
+rm(zoonotic, tax, names)
 
 # glimpse and see variables
 glimpse(data)
@@ -50,7 +59,7 @@ colnames(data)
 
 # remove the virus cols
 data <- data %>% 
-  select(-c("virus","vcites","vfilter","filter","zvirus"))
+  select(-c("virus","vcites","vfilter","filter","zvirus","...1","cnames"))
 
 #### Dummy Families
 ## make binary columns for genus
@@ -172,7 +181,7 @@ coverage_table <- mval %>%
 rownames(coverage_table) <- NULL
 
 # save as csv
-# write.csv(coverage_table, "ESA Poster/figs/coverage_table.csv", row.names = FALSE)
+write.csv(coverage_table, "/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/coverage_table.csv", row.names = FALSE)
 
 ## drop if not well represented
 data=data[keeps]
@@ -182,7 +191,7 @@ rm(mval,keeps,coverage_table)
 data <- data %>% 
   select(-c("tip","gen","fam","clade"))
 
-colnames(data) # resulting in 55 variables total, 51 covariates
+colnames(data) # resulting in 66 variables total, 64 covariates
 
 # change to pseudoabs for synurbic where all NAs are equal to 0
 data <- data %>%

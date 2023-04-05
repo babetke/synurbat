@@ -17,7 +17,7 @@ library(InformationValue)
 # data <- read_csv("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.csv") Directory for personal comp
 # data <- read_csv("/Volumes/BETKE 2021/synurbat/flat files/cleaned dataset 30 cutoff.csv") # directory for lab comp
 
-# data classes didn't hold in the cleaning file (may just want to remove that and factorize here OR save as RDS and read in here)
+# data classes didn't hold in the cleaned file (may just want to remove that and factorize here OR save as RDS and read in here)
 # data <- data %>% # Synurbic and variables that are factors according to COMBINE
 #   mutate(across(c("trophic_level","foraging_stratum","activity_cycle",
 #                   "disected_by_mountains", "glaciation", "biogeographical_realm","fam_EMBALLONURIDAE":"fam_VESPERTILIONIDAE"), 
@@ -26,16 +26,27 @@ library(InformationValue)
 # read in rds
 data <- readRDS("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.rds")
 
+# filter out the additional extinct bats
+names <- data[!is.na(data$category) & data$category == "EX", ]$species
+
+# remove the extinct bats
+data <- filter(data, !species %in% names)
+rm(names)
+
 # remove species col
 data <- data %>% 
-  select(-c(species, det_inv, biogeographical_realm)) 
+  select(-c(species, det_inv, biogeographical_realm, iucn2020_binomial)) 
 
-# how many NAs are there - 253
+# how many NAs are there - 250
 length(data$Synurbic[is.na(data$Synurbic)])
 
 # make Synurbic numeric (gbm will crash)
 data$Synurbic <- as.numeric(as.character(data$Synurbic))
 data$pseudo <- as.numeric(as.character(data$pseudo))
+
+# factor IUCN 
+data$category <- as.factor(data$category)
+data$population_trend <- as.factor(data$population_trend)
 
 # dataset without NAs in synurbic. NAs cannot be in response.
 na.data <- data[!is.na(data$Synurbic),]
