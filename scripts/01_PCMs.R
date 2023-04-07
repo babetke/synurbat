@@ -1,6 +1,6 @@
 ## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 03/21/2023
+## last updated 04/06/2023
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -37,9 +37,6 @@ tree=keep.tip(tree,data$tip)
 
 ## make label
 data$label=data$tip
-
-## fix family
-data$fam = ifelse(data$gen == "Miniopterus", "MINIOPTERIDAE", data$fam)
 
 ## merge
 cdata=comparative.data(phy=tree,data=data,names.col=label,vcv=T,na.omit=F,warn.dropped=T)
@@ -177,7 +174,7 @@ pfsum=function(pf){
 ## binary, adjust for log1p citations
 set.seed(1)
 bpf=gpf(Data=set$data,tree=set$phy,
-        frmla.phylo=Synurbic~phylo+cites,
+        frmla.phylo=Synurbic~phylo+log1p(cites),
         family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
 
 ## summarize
@@ -186,7 +183,7 @@ bpf_results=pfsum(bpf)$results
 ## repeat for pseudo
 set.seed(1)
 bpf2=gpf(Data=cdata$data,tree=cdata$phy,
-        frmla.phylo=Synurbic_pseudo~phylo+cites,
+        frmla.phylo=Synurbic_pseudo~phylo+log1p(cites),
         family=binomial,algorithm='phylo',nfactors=3,min.group.size=5)
 
 ## summarize
@@ -260,9 +257,26 @@ asr_plot=ggraph(g, layout="linear")+
   theme(legend.position = "none")
 
 ## simmap
-state.simmap=simmap(state.aov,nsim=1000)
+state.simmap=simmap(state.aov,nsim=10)
+#state.simmap=simmap(state.aov,nsim=1000)
 
-## summarize
+## lineage-through-time
+lobj=ltt(state.simmap,plot=F)
+tmp=data.frame(time=lobj[[1]]$times,
+               lobj[[1]]$ltt)
+names(tmp)=c("time","natural","anthropogenic","total")
+tmp$total=NULL
+
+## wide to long
+tmp=tidyr::gather(tmp,lin,number,natural:anthropogenic)
+
+## visualize
+ggplot(tmp,aes(time,number,colour=lin,group=lin))+
+  geom_line()+
+  scale_y_continuous(trans="log10")+
+  theme_bw()
+
+## summarize simmap
 simsum=summary(state.simmap,plot=F)
 
 ## get states
