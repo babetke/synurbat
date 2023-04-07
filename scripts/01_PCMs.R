@@ -260,8 +260,118 @@ asr_plot=ggraph(g, layout="linear")+
 state.simmap=simmap(state.aov,nsim=10)
 #state.simmap=simmap(state.aov,nsim=1000)
 
-## lineage-through-time
+## lineage-through-time for statistical analysis
 lobj=ltt(state.simmap,plot=F)
+
+## http://blog.phytools.org/2022/07/creating-lineage-through-time-plot.html
+foo<-function(tree,x){
+  tt<-map.to.singleton(tree)
+  H<-nodeHeights(tt)
+  h<-max(H)-branching.times(tt)
+  ss<-setNames(as.factor(names(tt$edge.length)),
+               tt$edge[,2])
+  lineages<-matrix(0,length(h),length(levels(x)),
+                   dimnames=list(names(h),levels(x)))
+  for(i in 1:length(h)){
+    ii<-intersect(which(h[i]>H[,1]),which(h[i]<=H[,2]))
+    lineages[i,]<-summary(ss[ii])
+  }
+  ii<-order(h)
+  times<-h[ii]
+  lineages<-lineages[ii,]
+  list(times=times,ltt=lineages)
+}
+
+## apply function
+ltts=lapply(state.simmap,foo,x=state)
+
+## add sim identity and save as data
+lset=lapply(1:length(ltts),function(x){
+  
+  ## get from list
+  tt=ltts[[x]]
+  
+  ## times
+  times=tt$times
+  
+  ## data
+  set=tt$ltt
+  
+  ## data frame
+  set=data.frame(times=times,
+             set)
+  names(set)=c("times","natural","anthropogenic")
+  
+  ## add sim
+  set$sim=x
+  
+  ## return
+  return(set)
+  ## resave as list
+  #return(list(times=times,ltt=ltt))
+
+})
+  
+## save as dataset
+lset=do.call(rbind.data.frame,lset)
+
+## wide to long
+lset=tidyr::gather(lset,lin,number,natural:anthropogenic)
+lset$lin=factor(lset$lin,levels=c("natural","anthropogenic"))
+
+## get means
+H=max(lset$times)
+TIMES<-seq(0,max(H),length.out=10000)
+LINEAGES<-matrix(0,length(TIMES),length(levels(state)))
+
+## iterate over times and ltts
+for(i in 1:length(TIMES)){
+  for(j in 1:length(ltts)){
+    ii<-which(ltts[[j]]$times<=TIMES[i])
+    ADD<-if(length(ii)==0) rep(0,length(levels(state))) else 
+      ltts[[j]]$ltt[max(ii),]/length(ltts)
+    LINEAGES[i,]<-LINEAGES[i,]+ADD
+  }
+}
+
+## save means
+mset=data.frame(TIMES,LINEAGES)
+names(mset)=c("times","natural","anthropogenic")
+mset=tidyr::gather(mset,lin,number,natural:anthropogenic)
+mset$lin=factor(mset$lin,levels=c("natural","anthropogenic"))
+
+## visualize
+ggplot()+
+  geom_line(data=lset,aes(times,number,colour=lin,group=sim),alpha=0.1,linewidth=0.1)+
+  geom_line(data=mset,aes(times,number,colour=lin),linewidth=1.25)+
+  scale_y_continuous(trans="log1p")+
+  theme_bw()+
+  #facet_wrap(~lin)+
+  scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
+  guides(colour="none")
+
+## save times and ltt into list
+lset=list()
+for(i in 1:length(lobj)){
+  
+  ## data frame
+  tmp=data.frame(time=lobj[[i]]$times,
+                 lobj[[i]]$ltt)
+  names(tmp)=c("time","natural","anthropogenic","total")
+  tmp$total=NULL
+  
+  ## save iteration
+  tmp$rep=factor(i)
+  
+  ## save in list
+  lset[[i]]=tmp
+}
+
+## convert to data frame
+ldata=do.call(rbind.data.frame,lset)
+
+## median across list objects
+
 tmp=data.frame(time=lobj[[1]]$times,
                lobj[[1]]$ltt)
 names(tmp)=c("time","natural","anthropogenic","total")
