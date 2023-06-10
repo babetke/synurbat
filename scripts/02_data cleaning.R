@@ -59,7 +59,7 @@ colnames(data)
 
 # remove the virus cols
 data <- data %>% 
-  select(-c("virus","vcites","vfilter","filter","zvirus","...1","cnames"))
+  select(-c("virus","vcites","vfilter","filter","zvirus","...1","pcnames", "ccnames", "icnames"))
 
 #### Dummy Families
 ## make binary columns for genus
@@ -95,7 +95,7 @@ data <- data %>% # Synurbic and variables that are factors according to COMBINE
   mutate(across(c("Synurbic","hibernation_torpor","fossoriality","trophic_level",
                   "foraging_stratum","activity_cycle", "freshwater", 
                   "marine","terrestrial_non-volant", "terrestrial_volant","island_endemicity",
-                  "disected_by_mountains", "glaciation", "biogeographical_realm"), 
+                  "disected_by_mountains", "glaciation", "biogeographical_realm", "category", "population_trend"), 
                 factor)) %>% 
   select(-c("MSW3_sciName_matched"))
 
@@ -149,7 +149,7 @@ mval$comp=round(mval$comp,2)
 # ggplot of coverage
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/trait_coverage.png", width=9.5,height=5.5,units="in",res=600)
 mval %>% 
-  filter(!column %in% c("fam","tip", "gen", "cites")) %>%
+  filter(!column %in% c("fam","tip", "gen", "cites", "iucn2020_binomial")) %>%
   ggplot(aes(comp)) +
   geom_histogram(bins = 50) +
   geom_vline(xintercept=0.30,linetype=2,linewidth=0.5) +
@@ -189,7 +189,7 @@ rm(mval,keeps,coverage_table)
 
 ## Clean out remaining variables?
 data <- data %>% 
-  select(-c("tip","gen","fam","clade"))
+  select(-c("tip","gen","fam","clade","iucn2020_binomial"))
 
 colnames(data) # resulting in 66 variables total, 64 covariates
 
