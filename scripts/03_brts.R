@@ -1,5 +1,6 @@
 # BRT analysis - Trait determinants of anthropogenic roosting
 # babetke@utexas.edu
+# Updated 06/15/2023
 
 # Script for data cleaning
 rm(list=ls()) 
@@ -26,30 +27,23 @@ library(InformationValue)
 # read in rds
 data <- readRDS("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.rds")
 
-# filter out the additional extinct bats
-names <- data[!is.na(data$category) & data$category == "EX", ]$species
-
-# remove the extinct bats
-data <- filter(data, !species %in% names)
-rm(names)
-
 # remove species col
 data <- data %>% 
-  select(-c(species, det_inv, biogeographical_realm, iucn2020_binomial)) 
+  select(-c(species, det_inv, biogeographical_realm)) 
 
-# how many NAs are there - 250
+# how many NAs are there - 237
 length(data$Synurbic[is.na(data$Synurbic)])
 
 # make Synurbic numeric (gbm will crash)
 data$Synurbic <- as.numeric(as.character(data$Synurbic))
 data$pseudo <- as.numeric(as.character(data$pseudo))
 
-# factor IUCN 
-data$category <- as.factor(data$category)
-data$population_trend <- as.factor(data$population_trend)
+# # factor IUCN 
+# data$category <- as.factor(data$category)
+# data$population_trend <- as.factor(data$population_trend)
 
 # dataset without NAs in synurbic. NAs cannot be in response.
-na.data <- data[!is.na(data$Synurbic),]
+na.data <- data[!is.na(data$Synurbic),] # 1042 species
 
 # Set up BRT tuning via search grid
 # function to make grids?
@@ -176,11 +170,15 @@ grid_search <- function(row, data_df, response, folds, nsplit){
 }
 
 hgrid <- makegrid(1, trees = seq(15000,50000,5000))
+
+# how many maxed out?
+grid_search_without_NAs %>% filter(best == n.trees) # 6, 3 each on 5000 and 10000 with shrinkage of 0.0005
+
 rgrid <- makegrid(1, c(15000, seq(20000, 50000, 10000))) #45, trimmed to not have 5000, or 10000 because they max out on
 
 # run for the two types of data?
-na.pars <- lapply(1:nrow(hgrid),function(x) hfit(x, data_df = na.data, response="Synurbic", folds = 10, nsplit = "yes"))
-f.pars <- lapply(1:nrow(hgrid),function(x) hfit(x, data_df = data, response="pseudo", folds = 10, nsplit = "yes"))
+na.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = na.data, response="Synurbic", folds = 10, nsplit = "yes"))
+f.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = data, response="pseudo", folds = 10, nsplit = "yes"))
 
 ## get results
 na.results <- data.frame(sapply(na.pars,function(x) x$trainAUC),

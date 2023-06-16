@@ -1,5 +1,6 @@
 # Data cleaning and trait coverage for BRT analysis
 # babetke@utexas.edu
+# Updated 06/15/2023
 
 # Script for data cleaning
 rm(list=ls()) 
@@ -53,6 +54,13 @@ names <- sub("_", " ", names)
 data <- filter(zoonotic, !species %in% names)
 rm(zoonotic, tax, names)
 
+# filter out the additional extinct bats in IUCN
+names <- data[!is.na(data$category) & data$category == "EX", ]$species
+
+# remove the extinct bats
+data <- filter(data, !species %in% names)
+rm(names)
+
 # glimpse and see variables
 glimpse(data)
 colnames(data)
@@ -99,7 +107,7 @@ data <- data %>% # Synurbic and variables that are factors according to COMBINE
                 factor)) %>% 
   select(-c("MSW3_sciName_matched"))
 
-length(colnames(data)) # 102 columns
+length(colnames(data)) # 106 columns
 
 # save before trimming
 saveRDS(data, "/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.rds")

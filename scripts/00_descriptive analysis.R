@@ -15,12 +15,12 @@ datat <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/s
 ## simple family tweak for now
 #datat$fam = ifelse(datat$gen == "Miniopterus", "MINIOPTERIDAE", datat$fam)
 
-# filter out the additional extinct bats in IUCN
-names <- datat[!is.na(datat$category) & datat$category == "EX", ]$species
-
-# remove the extinct bats
-datat <- filter(datat, !species %in% names)
-rm(names)
+# # filter out the additional extinct bats in IUCN -> moved to data cleaning file.
+# names <- datat[!is.na(datat$category) & datat$category == "EX", ]$species
+# 
+# # remove the extinct bats
+# datat <- filter(datat, !species %in% names)
+# rm(names)
 
 # uppercase
 datat$family = toTitleCase(tolower(datat$fam))
@@ -128,19 +128,24 @@ datat %>%
 #   rename(nonmissing = "FALSE", 
 #          missing = "TRUE")
 
-png("/Users/brianabetke/Desktop/IUCNcoverage.png",width=10,height=8,units="in",res=600)
-iucn_gg <- ggplot(datat, aes(reorder(category, is.na(Synurbic)))) + 
-  geom_bar(aes(fill = Synurbic), position = position_fill(reverse = TRUE)) +
-  coord_flip() +
-  stat_count(geom = "text", 
-             aes(label = after_stat(count)),
-             position=position_fill(vjust=1.05), colour="black") +
-  labs(x = NULL, y = "coverage") +
-  theme(legend.position = "top") +
-  theme_minimal() 
-dev.off()
+# png("/Users/brianabetke/Desktop/IUCNcoverage.png",width=10,height=8,units="in",res=600)
+# iucn_gg <- ggplot(datat, aes(reorder(category, is.na(Synurbic)))) + 
+#   geom_bar(aes(fill = Synurbic), position = position_fill(reverse = TRUE)) +
+#   coord_flip() +
+#   stat_count(geom = "text", 
+#              aes(label = after_stat(count)),
+#              position=position_fill(vjust=1.05), colour="black") +
+#   labs(x = NULL, y = "coverage") +
+#   theme(legend.position = "top") +
+#   theme_minimal() 
+# dev.off()
 
-cat_tab <- datat %>% group_by(factor(category)) %>% count() %>% rename("category"="factor(category)")
+cat_tab <- datat %>% 
+  group_by(factor(category)) %>% 
+  count() %>% 
+  rename("category"="factor(category)")
+
+# label for species numbers
 df3 <- data.frame(x = 7.75, y = 1.05, text = "no. spp.") 
 factor(datat$category, exclude = NULL) -> datat$category
 
