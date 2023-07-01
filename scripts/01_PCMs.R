@@ -1,6 +1,6 @@
 ## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 04/06/2023
+## last updated 06/16/2023
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -20,6 +20,15 @@ library(phytools)
 library(igraph)
 library(ggraph)
 library(tibble)
+library(phyloregion)
+
+## save theme
+th=theme_bw()+
+  theme(axis.text=element_text(size=10),
+        axis.title=element_text(size=11))+
+  theme(panel.grid.major=element_blank(),panel.grid.minor=element_blank())+
+  theme(axis.title.x=element_text(margin=margin(t=10,r=0,b=0,l=0)))+
+  theme(axis.title.y=element_text(margin=margin(t=0,r=10,b=0,l=0)))
 
 ## load in roosting data
 setwd("~/Desktop/synurbat/flat files")
@@ -38,6 +47,20 @@ tree=keep.tip(tree,data$tip)
 ## make label
 data$label=data$tip
 
+## species-level diversification rate = 1 / evolutionary distinctiveness using ES method
+## DR rates (supplement, section 1.2.2): Jetz, W., Thomas, G. H., Joy, J. B., Hartmann, K., & Mooers, A. O. (2012). The global diversity of birds in space and time. Nature, 491(7424), 444–448. doi:10.1038/nature11631
+es=phyloregion::evol_distinct(tree,type="equal.splits")
+
+## data
+pdata=data.frame(es=es,
+                 dr=1/es)
+pdata$tip=rownames(pdata)
+rm(es)
+
+## merge with data
+data=merge(data,pdata,by="tip")
+rm(pdata)
+
 ## merge
 cdata=comparative.data(phy=tree,data=data,names.col=label,vcv=T,na.omit=F,warn.dropped=T)
 
@@ -48,12 +71,27 @@ cdata$data$Species=cdata$data$tip
 cdata$data$Synurbic=as.numeric(as.character(cdata$data$Synurbic))
 cdata$data$Synurbic_pseudo=ifelse(is.na(cdata$data$Synurbic),0,cdata$data$Synurbic)
 
+## tally
+tab=table(cdata$data$Synurbic)
+round(tab["1"]/nrow(cdata$data),2)
+round(tab["0"]/nrow(cdata$data),2)
+
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
 
 ## save status and label
 cdata$data$status=factor(cdata$data$Synurbic)
 cdata$data$label=cdata$data$tip
+
+## pgls
+cdata$data$l10_dr=log10(cdata$data$dr)
+mod=pgls(l10_dr~Synurbic,data=cdata,lambda="ML")
+summary(mod)
+
+## pglm?
+
+
+## hisse
 
 ## trim to tree with data
 set=cdata[!is.na(cdata$data$Synurbic),]
@@ -230,7 +268,7 @@ edges=data.frame(from=rev(ARD.model$states),
 ## convert to network with meta
 g=graph_from_data_frame(edges,directed=T)
 V(g)$name=c("anthropogenic","natural")
-E(g)$rates=paste0(round(edges$rate,2))
+E(g)$rates=paste0(round(edges$rate,3))
 E(g)$type=c("natural","anthropogenic")
 
 ## plot
@@ -342,49 +380,56 @@ mset$lin=factor(mset$lin,levels=c("natural","anthropogenic"))
 
 ## visualize
 ggplot()+
-  geom_line(data=lset,aes(times,number,colour=lin,group=sim),alpha=0.1,linewidth=0.1)+
+  geom_line(data=lset,aes(times,number,colour=lin,group=sim),alpha=0.2,linewidth=0.1)+
   geom_line(data=mset,aes(times,number,colour=lin),linewidth=1.25)+
-  scale_y_continuous(trans="log1p")+
-  theme_bw()+
+  #scale_y_continuous(trans="log1p")+
+  #scale_y_sqrt()+
+  scale_y_log10()+
+  #theme_bw()+
+  th+
   #facet_wrap(~lin)+
   scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
   guides(colour="none")
 
-## save times and ltt into list
-lset=list()
-for(i in 1:length(lobj)){
-  
-  ## data frame
-  tmp=data.frame(time=lobj[[i]]$times,
-                 lobj[[i]]$ltt)
-  names(tmp)=c("time","natural","anthropogenic","total")
-  tmp$total=NULL
-  
-  ## save iteration
-  tmp$rep=factor(i)
-  
-  ## save in list
-  lset[[i]]=tmp
-}
+## reset states
+bstate=setNames(as.numeric(as.character(set$data$status)),rownames(set$data))
 
-## convert to data frame
-ldata=do.call(rbind.data.frame,lset)
+## BISSE
+library(diversitree)
+uphy=as.ultrametric(set$phy)
+p=starting.point.bisse(uphy)
+lik=make.bisse(tree=uphy,
+               states=bstate)
+fit=find.mle(lik,p)
 
-## median across list objects
+## extract coefficients
+round(coef(fit),2)
 
-tmp=data.frame(time=lobj[[1]]$times,
-               lobj[[1]]$ltt)
-names(tmp)=c("time","natural","anthropogenic","total")
-tmp$total=NULL
+## compare to equal rates of speciation
+lik.l=constrain(lik,lambda1~lambda0)
+fit.l=find.mle(lik.l,p[argnames(lik.l)])
 
-## wide to long
-tmp=tidyr::gather(tmp,lin,number,natural:anthropogenic)
+## compare pars
+round(rbind(full=coef(fit),equal.l=coef(fit.l,TRUE)),3)
 
-## visualize
-ggplot(tmp,aes(time,number,colour=lin,group=lin))+
-  geom_line()+
-  scale_y_continuous(trans="log10")+
-  theme_bw()
+## anova to compare formal
+anova(fit,equal.l=fit.l)
+
+## set prior
+prior<-make.prior.exponential(1/(2*(p[1]-p[3])))
+
+## mcmc
+set.seed(1) 
+tmp=mcmc(lik,fit$par,nsteps=100,prior=prior,lower=0,w=rep(1,6),print.every=0) 
+w=diff(sapply(tmp[2:7],range))
+
+## run chain
+samples<-mcmc(lik,fit$par,nsteps=10000,w=w,lower=0,prior=prior, print.every=0)
+
+## plot
+col<-c("#004165","#eaab00") 
+profiles.plot(samples[c("lambda0","lambda1")],col.line=col,las=1, xlab="Speciationrate",legend="topright") 
+abline(v=c(.1,.2),col=col)
 
 ## summarize simmap
 simsum=summary(state.simmap,plot=F)
