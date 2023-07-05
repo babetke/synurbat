@@ -1,6 +1,6 @@
 ## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 06/16/2023
+## last updated 07/03/2023
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -21,6 +21,10 @@ library(igraph)
 library(ggraph)
 library(tibble)
 library(phyloregion)
+library(diversitree)
+library(tidyr)
+library(ggdist)
+library(MuMIn)
 
 ## save theme
 th=theme_bw()+
@@ -47,19 +51,8 @@ tree=keep.tip(tree,data$tip)
 ## make label
 data$label=data$tip
 
-## species-level diversification rate = 1 / evolutionary distinctiveness using ES method
-## DR rates (supplement, section 1.2.2): Jetz, W., Thomas, G. H., Joy, J. B., Hartmann, K., & Mooers, A. O. (2012). The global diversity of birds in space and time. Nature, 491(7424), 444–448. doi:10.1038/nature11631
-es=phyloregion::evol_distinct(tree,type="equal.splits")
-
-## data
-pdata=data.frame(es=es,
-                 dr=1/es)
-pdata$tip=rownames(pdata)
-rm(es)
-
-## merge with data
-data=merge(data,pdata,by="tip")
-rm(pdata)
+## state colors
+scols=c("#8470FF","#9DD866")
 
 ## merge
 cdata=comparative.data(phy=tree,data=data,names.col=label,vcv=T,na.omit=F,warn.dropped=T)
@@ -83,15 +76,8 @@ cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='
 cdata$data$status=factor(cdata$data$Synurbic)
 cdata$data$label=cdata$data$tip
 
-## pgls
-cdata$data$l10_dr=log10(cdata$data$dr)
-mod=pgls(l10_dr~Synurbic,data=cdata,lambda="ML")
-summary(mod)
-
-## pglm?
-
-
-## hisse
+## factor
+cdata$data$sgroup=factor(cdata$data$Synurbic)
 
 ## trim to tree with data
 set=cdata[!is.na(cdata$data$Synurbic),]
@@ -227,124 +213,192 @@ bpf2=gpf(Data=cdata$data,tree=cdata$phy,
 ## summarize
 bpf2_results=pfsum(bpf2)$results
 
-## extract states for known status
-state=setNames(set$data$status,rownames(set$data))
+## BiSSE
+bstate=setNames(as.numeric(as.character(set$data$Synurbic)),rownames(set$data))
+uphy=as.ultrametric(set$phy)
+p=starting.point.bisse(uphy)
+bmodel=make.bisse(tree=uphy,
+                  states=bstate)
+fit1=find.mle(bmodel,p)
+
+## constrain all (equal rates model)
+cmodel1=constrain(bmodel,lambda1~lambda0,mu1~mu0,q01~q10)
+
+## constrain lambda and mu but not q (all rates different model)
+cmodel2=constrain(bmodel,lambda1~lambda0,mu1~mu0)
+
+## constrain lambda and mu, 0 to 1 only (irreversible model)
+cmodel3=constrain(bmodel,lambda1~lambda0,mu1~mu0,q10~0)
+
+## constrain  mu, 0 to 1 only (irreversible model)
+cmodel4=constrain(bmodel,lambda1~lambda0,q10~0)
+
+## constrain  lambda, 0 to 1 only (irreversible model)
+cmodel5=constrain(bmodel,mu1~mu0,q10~0)
+
+## constrain q only (irreversible)
+cmodel6=constrain(bmodel,q10~0)
+
+## constrain lambda only
+cmodel7=constrain(bmodel,lambda1~lambda0)
+
+## constrain mu only
+cmodel8=constrain(bmodel,mu1~mu0)
+
+## fit
+cfit1=find.mle(cmodel1,p[argnames(cmodel1)])
+cfit2=find.mle(cmodel2,p[argnames(cmodel2)])
+cfit3=find.mle(cmodel3,p[argnames(cmodel3)])
+cfit4=find.mle(cmodel4,p[argnames(cmodel4)])
+cfit5=find.mle(cmodel5,p[argnames(cmodel5)])
+cfit6=find.mle(cmodel6,p[argnames(cmodel6)])
+cfit7=find.mle(cmodel7,p[argnames(cmodel7)])
+cfit8=find.mle(cmodel8,p[argnames(cmodel8)])
+
+## save in list
+blist=list(fit1,cfit1,cfit2,cfit3,cfit4,cfit5,cfit6,cfit7,cfit8)
+#anova(fit1,cfit1,cfit2,cfit3,cfit4,cfit5,cfit6,cfit7,cfit8)
+
+## model comparison table
+bcomp=data.frame(AIC=sapply(blist,AIC),
+                 k=sapply(blist,function(x) length(coef(x))),
+                 model=sapply(blist,function(x) paste(names(x$par),collapse=", ")))
+bcomp=bcomp[order(bcomp$AIC),]
+bcomp$delta=round(bcomp$AIC-bcomp$AIC[1],2)
+bcomp$wi=round(Weights(bcomp$AIC),2)
+
+## rearrange
+bcomp=bcomp[c("model","k","delta","wi")]
+
+## compare top models
+anova(blist[[as.numeric(rownames(bcomp[1,]))]],
+      blist[[as.numeric(rownames(bcomp[2,]))]])
+
+## set top via parsimony
+tmodel=attr(blist[[as.numeric(rownames(bcomp[1,]))]],"func")
+top=find.mle(tmodel,p[argnames(tmodel)])
+
+## MCMC framework, exponential prior as character-independent rate
+prior=make.prior.exponential(1/(2*(p[1]-p[3])))
+
+## assign w
+set.seed(1)
+tmp=mcmc(tmodel,top$par,nsteps=100,prior=prior,lower=0,w=rep(1,length(top$par)),print.every=0) 
+w=diff(sapply(tmp[names(top$par)],range))
+
+## run the chain to get 95% CIs
+set.seed(1)
+samples=mcmc(tmodel,top$par,nsteps=1000,w=w,lower=0,prior=prior,print.every=0)
+samples$chain=1:nrow(samples)
+
+## save
+samples_raw=samples
+
+## cut first 20% as burn-in
+end=0.2*nrow(samples)
+keep=(end+1):nrow(samples)
+samples=samples[keep,]
+
+## posterior package to summarize
+library(posterior)
+sdraw=data.frame(summarise_draws(samples,mean=mean,~ quantile(.x, probs = c(.025, .975))))
+
+## minimize 
+sdraw=sdraw[sdraw$variable%in%c("lambda0","lambda1","mu0","mu1","q01","q10"),]
+rownames(sdraw)=sdraw$variable
+
+## save q matrix for stochastic character mapping
+qm=matrix(c(-sdraw["q01","mean"],sdraw["q10","mean"],sdraw["q01","mean"],-sdraw["q10","mean"]),2)
+rownames(qm)=c("0","1")
+colnames(qm)=rownames(qm)
+
+## simplify
+tmp=samples[names(top$par)]
+tmp=gather(tmp,par,est,head(names(top$par),1):tail(names(top$par),1))
+
+## fix par
+tmp$par2=revalue(tmp$par,
+                 c("lambda0"="lambda[0]",
+                   "lambda1"="lambda[1]",
+                   "mu0"="mu[0]",
+                   "mu1"="mu[1]",
+                   "q01"="italic(q)[0][1]",
+                   "q10"="italic(q)[1][0]"))
+
+## order parameters
+tmp$par=factor(tmp$par,levels=c("lambda0","lambda1","mu0","mu1","q10","q01"))
+
+## assign similar levels for par2
+tmp$par2=factor(tmp$par2,levels=unique(tmp[order(tmp$par),"par2"]))
+
+## assign type
+tmp$type=ifelse(tmp$par%in%c("lambda0","mu0","q10"),"natural","anthropogenic")
+tmp$type=factor(tmp$type,levels=rev(unique(tmp$type)))
+
+## parameter type
+tmp$ptype=revalue(tmp$par,
+                  c("mu0"="extinction",
+                    "mu1"="extinction",
+                    "lambda0"="speciation",
+                    "lambda1"="speciation",
+                    "q10"="transition",
+                    "q01"="transition"))
+
+## factor
+tmp$ptype=factor(tmp$ptype,levels=c("speciation","extinction","transition"))
+
+## ggdist
+bisse_plot=ggplot(tmp,aes(par2,est,colour=type,fill=type))+
+  coord_flip()+
+  facet_wrap(~ptype,ncol=1,scales="free_y",strip.position="right",shrink=T)+
+  stat_halfeye(slab_alpha=0.25,point_size=2)+
+  th+
+  labs(y="Posterior Samples",x="BiSSE Parameters")+
+  scale_x_discrete(labels=scales::label_parse())+
+  theme(axis.text.y=element_text(size=12),
+        strip.text=element_blank(),
+        strip.background=element_blank())+
+  guides(colour="none",fill="none")+
+  scale_colour_manual(values=rev(scols))+
+  scale_fill_manual(values=rev(scols))
 
 ## set prior on root node as non-anthropogenic
 rootn=c(1,0)
-names(rootn)=levels(set$data$status)
+names(rootn)=levels(factor(set$data$Synurbic))
 
-## fit models
-ER.model=fitMk(set$phy,state,model="ER",pi=as.matrix(rootn)) 
-ARD.model=fitMk(set$phy,state,model="ARD",pi=as.matrix(rootn)) 
-Irr.model=fitMk(set$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
-                pi=as.matrix(rootn)) 
+## test
+set.seed(1)
+mk=make.simmap(uphy,bstate,Q=qm,nsim=5,pi=as.matrix(rootn))
 
-## model comparison
-state.aov=anova(ER.model,ARD.model,Irr.model)
+## summarize simmap
+simsum=summary(mk,plot=F)
 
-## delta
-state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
-state.aov$delta=state.aov$AIC-state.aov$AIC[1]
-round(state.aov,2)
-
-## plot
-plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
-
-## plot in ggplot
-qm=as.Qmatrix(ARD.model)
-qm=matrix(as.numeric(qm),
-          ncol=length(ARD.model$states),
-          nrow=length(ARD.model$states))
-rownames(qm)=ARD.model$states
-colnames(qm)=ARD.model$states
-diag(qm)=NA
-
-## make edges
-edges=data.frame(from=rev(ARD.model$states),
-                 to=(ARD.model$states),
-                 rate=qm[!is.na(qm)])
-
-## convert to network with meta
-g=graph_from_data_frame(edges,directed=T)
-V(g)$name=c("anthropogenic","natural")
-E(g)$rates=paste0(round(edges$rate,3))
-E(g)$type=c("natural","anthropogenic")
-
-## plot
-asr_plot=ggraph(g, layout="linear")+
-  geom_edge_arc(aes(edge_width=rate,
-                    label=rates,
-                    colour=type),
-                label_dodge=unit(-5,'mm'),
-                strength=0.65,
-                label_size=2.5,
-                angle_calc='along',
-                arrow=arrow(length=unit(3,'mm')),
-                start_cap=square(15,'mm'),
-                end_cap=square(15,'mm'))+
-  #geom_node_point(size=30,shape=16)+
-  geom_node_text(aes(label=name,
-                     colour=name),
-                 size=2.5,fontface="bold",
-                 nudge_x = c(0.06,-0.02))+
-  scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
-  scale_edge_width_continuous(range=c(0.25,1.5))+
-  scale_edge_color_manual(values=rev(c("palegreen3","wheat4")))+
-  theme_void()+
-  theme(legend.position = "none")
-
-## simmap
-state.simmap=simmap(state.aov,nsim=10)
-#state.simmap=simmap(state.aov,nsim=1000)
-
-## lineage-through-time for statistical analysis
-lobj=ltt(state.simmap,plot=F)
-
-## http://blog.phytools.org/2022/07/creating-lineage-through-time-plot.html
-foo<-function(tree,x){
-  tt<-map.to.singleton(tree)
-  H<-nodeHeights(tt)
-  h<-max(H)-branching.times(tt)
-  ss<-setNames(as.factor(names(tt$edge.length)),
-               tt$edge[,2])
-  lineages<-matrix(0,length(h),length(levels(x)),
-                   dimnames=list(names(h),levels(x)))
-  for(i in 1:length(h)){
-    ii<-intersect(which(h[i]>H[,1]),which(h[i]<=H[,2]))
-    lineages[i,]<-summary(ss[ii])
-  }
-  ii<-order(h)
-  times<-h[ii]
-  lineages<-lineages[ii,]
-  list(times=times,ltt=lineages)
-}
-
-## apply function
-ltts=lapply(state.simmap,foo,x=state)
+## lineage-through-time
+lobj=ltt(mk,plot=F)
 
 ## add sim identity and save as data
-lset=lapply(1:length(ltts),function(x){
+lset=lapply(1:length(lobj),function(x){
   
   ## get from list
-  tt=ltts[[x]]
+  tt=lobj[[x]]
   
   ## times
   times=tt$times
   
   ## data
-  set=tt$ltt
+  lset=data.frame(tt$ltt)
+  lset$total=NULL
   
   ## data frame
-  set=data.frame(times=times,
-             set)
-  names(set)=c("times","natural","anthropogenic")
+  lset=data.frame(times=times,
+             lset)
+  names(lset)=c("times","natural","anthropogenic")
   
   ## add sim
-  set$sim=x
+  lset$sim=x
   
   ## return
-  return(set)
+  return(lset)
   ## resave as list
   #return(list(times=times,ltt=ltt))
 
@@ -360,81 +414,42 @@ lset$lin=factor(lset$lin,levels=c("natural","anthropogenic"))
 ## get means
 H=max(lset$times)
 TIMES<-seq(0,max(H),length.out=10000)
-LINEAGES<-matrix(0,length(TIMES),length(levels(state)))
+LINEAGES<-matrix(0,length(TIMES),length(levels(set$data$sgroup))+1)
 
 ## iterate over times and ltts
 for(i in 1:length(TIMES)){
-  for(j in 1:length(ltts)){
-    ii<-which(ltts[[j]]$times<=TIMES[i])
-    ADD<-if(length(ii)==0) rep(0,length(levels(state))) else 
-      ltts[[j]]$ltt[max(ii),]/length(ltts)
+  for(j in 1:length(lobj)){
+    ii<-which(lobj[[j]]$times<=TIMES[i])
+    ADD<-if(length(ii)==0) rep(0,length(levels(set$data$sgroup))) else 
+      lobj[[j]]$ltt[max(ii),]/length(lobj)
     LINEAGES[i,]<-LINEAGES[i,]+ADD
   }
 }
 
 ## save means
 mset=data.frame(TIMES,LINEAGES)
+mset$X3=NULL
 names(mset)=c("times","natural","anthropogenic")
 mset=tidyr::gather(mset,lin,number,natural:anthropogenic)
 mset$lin=factor(mset$lin,levels=c("natural","anthropogenic"))
 
 ## visualize
-ggplot()+
+ltt_plot=ggplot()+
   geom_line(data=lset,aes(times,number,colour=lin,group=sim),alpha=0.2,linewidth=0.1)+
   geom_line(data=mset,aes(times,number,colour=lin),linewidth=1.25)+
-  #scale_y_continuous(trans="log1p")+
-  #scale_y_sqrt()+
-  scale_y_log10()+
-  #theme_bw()+
+  scale_y_continuous(trans = scales::pseudo_log_trans(2, 1000), breaks=c(1,10,100,1000), limits=c(0,1000), 
+                     labels = scales::trans_format("log10", scales::math_format(10^.x)))+
   th+
-  #facet_wrap(~lin)+
-  scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
-  guides(colour="none")
+  scale_colour_manual(values=scols)+
+  guides(colour="none")+
+  labs(x="Relative Time",y="Number of Lineages")
 
-## reset states
-bstate=setNames(as.numeric(as.character(set$data$status)),rownames(set$data))
+## extract statistics
+mean(round(sapply(lobj,function(x) x$gamma),2))
+var(round(sapply(lobj,function(x) x$gamma),2))
+mean(round(sapply(lobj,function(x) x$p),3))
 
-## BISSE
-library(diversitree)
-uphy=as.ultrametric(set$phy)
-p=starting.point.bisse(uphy)
-lik=make.bisse(tree=uphy,
-               states=bstate)
-fit=find.mle(lik,p)
-
-## extract coefficients
-round(coef(fit),2)
-
-## compare to equal rates of speciation
-lik.l=constrain(lik,lambda1~lambda0)
-fit.l=find.mle(lik.l,p[argnames(lik.l)])
-
-## compare pars
-round(rbind(full=coef(fit),equal.l=coef(fit.l,TRUE)),3)
-
-## anova to compare formal
-anova(fit,equal.l=fit.l)
-
-## set prior
-prior<-make.prior.exponential(1/(2*(p[1]-p[3])))
-
-## mcmc
-set.seed(1) 
-tmp=mcmc(lik,fit$par,nsteps=100,prior=prior,lower=0,w=rep(1,6),print.every=0) 
-w=diff(sapply(tmp[2:7],range))
-
-## run chain
-samples<-mcmc(lik,fit$par,nsteps=10000,w=w,lower=0,prior=prior, print.every=0)
-
-## plot
-col<-c("#004165","#eaab00") 
-profiles.plot(samples[c("lambda0","lambda1")],col.line=col,las=1, xlab="Speciationrate",legend="topright") 
-abline(v=c(.1,.2),col=col)
-
-## summarize simmap
-simsum=summary(state.simmap,plot=F)
-
-## get states
+## get states from simsum
 top_prob=data.frame(simsum$ace)
 names(top_prob)=c("neg","pos")
 
@@ -450,166 +465,53 @@ dtree=treeio::full_join(as.treedata(set$phy),set$data,by="label")
 dtree=treeio::full_join(dtree,asrs,by="node")
 
 ## circular tree for known data, with colors
-circ=ggtree(dtree, layout="circular",aes(colour=asr),size=0.25)+
-  scale_colour_gradient(low="palegreen3",high="wheat4")+
+circ=ggtree(dtree, layout="rectangular",
+            ladderize=T,right=T,
+            aes(colour=asr),size=0.25)+
+  scale_colour_gradient(low=scols[1],high=scols[2])+
   guides(colour="none")
 
 ## add raw data into heatmap
 tdat=as.data.frame(set$data$Synurbic)
 rownames(tdat)=set$phy$tip.label
-asr_tree=gheatmap(circ,tdat,offset=0.1,width=0.05,colnames=F,
-                  low="palegreen3",high="wheat4")+
-  theme(legend.position = "none")
+asr_tree=gheatmap(circ,tdat,offset=0.1,width=0.025,colnames=F,
+                  low=scols[1],high=scols[2],color=NA)+
+  theme(legend.position = "bottom",
+        legend.text=element_text(size=8),
+        legend.margin=margin(t=-2.5,b=-2.5),
+        legend.title=element_text(size=10))+
+  guides(colour=guide_colorbar(barwidth=8,barheight=0.75,
+                               title=expression(paste(italic(P),"(Anthropogenic Roosting)")),
+                               title.vjust=1),
+         fill="none")
 
 ## add phylofactor
 asr_tree=asr_tree+
   geom_hilight(node=bpf_results$node[1],
-               alpha=0.5,fill="grey90")+
+               fill=NA,colour="black",linewith=2)+
   geom_hilight(node=bpf_results$node[2],
-               alpha=0.5,fill="grey90")
+               fill=NA,colour="black",linewith=2)
 
 ## label
 asr_tree=asr_tree+
   geom_cladelabel(node=bpf_results$node[1],
-                  label="Pteropodidae", 
-                  offset=5, offset.text = 5,
-                  angle=-75, fontsize = 2)+
+                  label="Pteropodidae",hjust=0.55,
+                  offset=2.5, offset.text = 2.5,
+                  angle=90, fontsize = 3)+
   geom_cladelabel(node=bpf_results$node[2],
-                  label="Noctilionoidea", 
-                  offset=5, offset.text = 5,
-                  angle=45, fontsize = 2)
+                  label="Noctilionoidea",hjust=0.5,
+                  offset=2.5, offset.text = 2.5,
+                  angle=90, fontsize = 3)
 
-## combine plots
+## combine bisse and ltt
+bt=egg::ggarrange(bisse_plot,ltt_plot,ncol=1,heights=c(1.5,1.1))
+
+## combine all plots
 library(patchwork)
-setwd("~/Desktop")
-png("test.png",width=4,height=5,units="in",res=300)
-asr_tree+asr_plot+plot_layout(ncol=1, heights=c(3,1))
+setwd("/Users/danielbecker/Desktop/synurbat/figures")
+png("Figure 4.png",width=7,height=5,units="in",res=300)
+(asr_tree|bt)+plot_layout(widths=c(1.5,1))
 dev.off()
 
-## repeat for pseudoabsence dataset
-cdata$data$status=as.character(cdata$data$Synurbic_pseudo)
+## repeat BiSSE and SCM for pseudoabsence dataset
 
-## extract states for known status
-state=setNames(cdata$data$status,rownames(cdata$data))
-
-## set prior on root node as non-anthropogenic
-rootn=c(1,0)
-names(rootn)=levels(cdata$data$status)
-
-## fit models
-ER.model=fitMk(cdata$phy,state,model="ER",pi=as.matrix(rootn)) 
-ARD.model=fitMk(cdata$phy,state,model="ARD",pi=as.matrix(rootn)) 
-Irr.model=fitMk(cdata$phy,state,model=matrix(c(0,1,0,0),2,2,byrow=TRUE),
-                pi=as.matrix(rootn)) 
-
-## model comparison
-state.aov=anova(ER.model,ARD.model,Irr.model)
-
-## delta
-state.aov=state.aov[order(state.aov$AIC,decreasing=F),]
-state.aov$delta=state.aov$AIC-state.aov$AIC[1]
-round(state.aov,2)
-
-## plot
-plot(ARD.model,width=T,color=T,offset=0.1,tol=0)
-
-## plot in ggplot
-qm=as.Qmatrix(ARD.model)
-qm=matrix(as.numeric(qm),
-          ncol=length(ARD.model$states),
-          nrow=length(ARD.model$states))
-rownames(qm)=ARD.model$states
-colnames(qm)=ARD.model$states
-diag(qm)=NA
-
-## make edges
-edges=data.frame(from=rev(ARD.model$states),
-                 to=(ARD.model$states),
-                 rate=qm[!is.na(qm)])
-
-## convert to network with meta
-g=graph_from_data_frame(edges,directed=T)
-V(g)$name=c("anthropogenic","natural")
-E(g)$rates=paste0(round(edges$rate,2))
-E(g)$type=c("natural","anthropogenic")
-
-## plot
-asr_plot=ggraph(g, layout="linear")+
-  geom_edge_arc(aes(edge_width=rate,
-                    label=rates,
-                    colour=type),
-                label_dodge=unit(-5,'mm'),
-                strength=0.65,
-                label_size=2.5,
-                angle_calc='along',
-                arrow=arrow(length=unit(3,'mm')),
-                start_cap=square(15,'mm'),
-                end_cap=square(15,'mm'))+
-  #geom_node_point(size=30,shape=16)+
-  geom_node_text(aes(label=name,
-                     colour=name),
-                 size=2.5,fontface="bold",
-                 nudge_x = c(0.06,-0.02))+
-  scale_colour_manual(values=rev(c("palegreen3","wheat4")))+
-  scale_edge_width_continuous(range=c(0.25,1.5))+
-  scale_edge_color_manual(values=rev(c("palegreen3","wheat4")))+
-  theme_void()+
-  theme(legend.position = "none")
-
-## simmap
-state.simmap=simmap(state.aov,nsim=100)
-
-## summarize
-simsum=summary(state.simmap,plot=F)
-
-## get states
-top_prob=data.frame(simsum$ace)
-names(top_prob)=c("neg","pos")
-
-## make tibble
-asrs=tibble(node=as.numeric(rownames(top_prob)),
-            asr=top_prob$pos)
-asrs=asrs[!is.na(asrs$node),]
-
-## save tree
-dtree=treeio::full_join(as.treedata(cdata$phy),set$data,by="label")
-
-## join with asrs
-dtree=treeio::full_join(dtree,asrs,by="node")
-
-## circular tree for known data, with colors
-circ=ggtree(dtree, layout="circular",aes(colour=asr),size=0.25)+
-  scale_colour_gradient(low="palegreen3",high="wheat4")+
-  guides(colour="none")
-
-## add raw data into heatmap
-tdat=as.data.frame(cdata$data$Synurbic_pseudo)
-rownames(tdat)=cdata$phy$tip.label
-asr_tree=gheatmap(circ,tdat,offset=0.1,width=0.05,colnames=F,
-                  low="palegreen3",high="wheat4")+
-  theme(legend.position = "none")
-
-## add phylofactor
-asr_tree=asr_tree+
-  geom_hilight(node=bpf2_results$node[1],
-               alpha=0.5,fill="grey90")+
-  geom_hilight(node=bpf2_results$node[2],
-               alpha=0.5,fill="grey90")
-
-## label
-asr_tree=asr_tree+
-  geom_cladelabel(node=bpf2_results$node[1],
-                  label="Pteropodidae", 
-                  offset=5, offset.text = 5,
-                  angle=-75, fontsize = 2)+
-  geom_cladelabel(node=bpf2_results$node[2],
-                  label="sub-Phyllostomidae", 
-                  offset=5, offset.text = 5,
-                  angle=45, fontsize = 2)
-
-## combine plots
-library(patchwork)
-setwd("~/Desktop")
-png("test2.png",width=4,height=5,units="in",res=300)
-asr_tree+asr_plot+plot_layout(ncol=1, heights=c(3,1))
-dev.off()
