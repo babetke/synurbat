@@ -513,5 +513,149 @@ png("Figure 4.png",width=7,height=5,units="in",res=300)
 (asr_tree|bt)+plot_layout(widths=c(1.5,1))
 dev.off()
 
-## repeat BiSSE and SCM for pseudoabsence dataset
+## repeat BiSSE for pseudoabsence dataset
+bstate=setNames(as.numeric(as.character(cdata$data$Synurbic_pseudo)),rownames(cdata$data))
+uphy=as.ultrametric(cdata$phy)
+p=starting.point.bisse(uphy)
+bmodel=make.bisse(tree=uphy,
+                  states=bstate)
+fit1=find.mle(bmodel,p)
 
+## constrain all (equal rates model)
+cmodel1=constrain(bmodel,lambda1~lambda0,mu1~mu0,q01~q10)
+
+## constrain lambda and mu but not q (all rates different model)
+cmodel2=constrain(bmodel,lambda1~lambda0,mu1~mu0)
+
+## constrain lambda and mu, 0 to 1 only (irreversible model)
+cmodel3=constrain(bmodel,lambda1~lambda0,mu1~mu0,q10~0)
+
+## constrain  mu, 0 to 1 only (irreversible model)
+cmodel4=constrain(bmodel,lambda1~lambda0,q10~0)
+
+## constrain  lambda, 0 to 1 only (irreversible model)
+cmodel5=constrain(bmodel,mu1~mu0,q10~0)
+
+## constrain q only (irreversible)
+cmodel6=constrain(bmodel,q10~0)
+
+## constrain lambda only
+cmodel7=constrain(bmodel,lambda1~lambda0)
+
+## constrain mu only
+cmodel8=constrain(bmodel,mu1~mu0)
+
+## fit
+cfit1=find.mle(cmodel1,p[argnames(cmodel1)])
+cfit2=find.mle(cmodel2,p[argnames(cmodel2)])
+cfit3=find.mle(cmodel3,p[argnames(cmodel3)])
+cfit4=find.mle(cmodel4,p[argnames(cmodel4)])
+cfit5=find.mle(cmodel5,p[argnames(cmodel5)])
+cfit6=find.mle(cmodel6,p[argnames(cmodel6)])
+cfit7=find.mle(cmodel7,p[argnames(cmodel7)])
+cfit8=find.mle(cmodel8,p[argnames(cmodel8)])
+
+## save in list
+blist=list(fit1,cfit1,cfit2,cfit3,cfit4,cfit5,cfit6,cfit7,cfit8)
+
+## model comparison table
+bcomp2=data.frame(AIC=sapply(blist,AIC),
+                 k=sapply(blist,function(x) length(coef(x))),
+                 model=sapply(blist,function(x) paste(names(x$par),collapse=", ")))
+bcomp2=bcomp2[order(bcomp2$AIC),]
+bcomp2$delta=round(bcomp2$AIC-bcomp2$AIC[1],2)
+bcomp2$wi=round(Weights(bcomp2$AIC),2)
+
+## rearrange
+bcomp2=bcomp2[c("model","k","delta","wi")]
+
+## compare top models
+anova(blist[[as.numeric(rownames(bcomp2[1,]))]],
+      blist[[as.numeric(rownames(bcomp2[2,]))]])
+
+## set top via parsimony
+tmodel=attr(blist[[as.numeric(rownames(bcomp2[1,]))]],"func")
+top=find.mle(tmodel,p[argnames(tmodel)])
+
+## MCMC framework, exponential prior as character-independent rate
+prior=make.prior.exponential(1/(2*(p[1]-p[3])))
+
+## assign w
+set.seed(1)
+tmp=mcmc(tmodel,top$par,nsteps=100,prior=prior,lower=0,w=rep(1,length(top$par)),print.every=0) 
+w=diff(sapply(tmp[names(top$par)],range))
+
+## run the chain to get 95% CIs
+set.seed(1)
+samples=mcmc(tmodel,top$par,nsteps=1000,w=w,lower=0,prior=prior,print.every=0)
+samples$chain=1:nrow(samples)
+
+## save
+samples_raw=samples
+
+## cut first 20% as burn-in
+end=0.2*nrow(samples)
+keep=(end+1):nrow(samples)
+samples=samples[keep,]
+
+## posterior package to summarize
+library(posterior)
+sdraw=data.frame(summarise_draws(samples,mean=mean,~ quantile(.x, probs = c(.025, .975))))
+
+## minimize 
+sdraw=sdraw[sdraw$variable%in%c("lambda0","lambda1","mu0","mu1","q01","q10"),]
+rownames(sdraw)=sdraw$variable
+
+## simplify
+tmp=samples[names(top$par)]
+tmp=gather(tmp,par,est,head(names(top$par),1):tail(names(top$par),1))
+
+## fix par
+tmp$par2=revalue(tmp$par,
+                 c("lambda0"="lambda[0]",
+                   "lambda1"="lambda[1]",
+                   "mu0"="mu[0]",
+                   "mu1"="mu[1]",
+                   "q01"="italic(q)[0][1]",
+                   "q10"="italic(q)[1][0]"))
+
+## order parameters
+tmp$par=factor(tmp$par,levels=c("lambda0","lambda1","mu0","mu1","q10","q01"))
+
+## assign similar levels for par2
+tmp$par2=factor(tmp$par2,levels=unique(tmp[order(tmp$par),"par2"]))
+
+## assign type
+tmp$type=ifelse(tmp$par%in%c("lambda0","mu0","q10"),"natural","anthropogenic")
+tmp$type=factor(tmp$type,levels=rev(unique(tmp$type)))
+
+## parameter type
+tmp$ptype=revalue(tmp$par,
+                  c("mu0"="extinction",
+                    "mu1"="extinction",
+                    "lambda0"="speciation",
+                    "lambda1"="speciation",
+                    "q10"="transition",
+                    "q01"="transition"))
+
+## factor
+tmp$ptype=factor(tmp$ptype,levels=c("speciation","extinction","transition"))
+
+## ggdist
+setwd("/Users/danielbecker/Desktop/synurbat/figures")
+png("Figure S3.png",width=4,height=4,units="in",res=300)
+ggplot(tmp,aes(par2,est,colour=type,fill=type))+
+  coord_flip()+
+  facet_wrap(~ptype,ncol=1,scales="free_y",strip.position="right",shrink=T)+
+  stat_halfeye(slab_alpha=0.25,point_size=2)+
+  th+
+  labs(y="Posterior Samples",x="BiSSE Parameters")+
+  scale_x_discrete(labels=scales::label_parse())+
+  theme(axis.text.y=element_text(size=12),
+        strip.text=element_blank(),
+        strip.background=element_blank())+
+  theme(legend.position="top")+
+  #guides(colour="none",fill="none")+
+  scale_colour_manual(values=rev(scols))+
+  scale_fill_manual(values=rev(scols))
+dev.off()
