@@ -215,7 +215,7 @@ bpf2_results=pfsum(bpf2)$results
 
 ## BiSSE
 bstate=setNames(as.numeric(as.character(set$data$Synurbic)),rownames(set$data))
-uphy=as.ultrametric(set$phy)
+uphy=force.ultrametric(set$phy)
 p=starting.point.bisse(uphy)
 bmodel=make.bisse(tree=uphy,
                   states=bstate)
@@ -288,7 +288,7 @@ w=diff(sapply(tmp[names(top$par)],range))
 
 ## run the chain to get 95% CIs
 set.seed(1)
-samples=mcmc(tmodel,top$par,nsteps=1000,w=w,lower=0,prior=prior,print.every=0)
+samples=mcmc(tmodel,top$par,nsteps=2000,w=w,lower=0,prior=prior,print.every=0)
 samples$chain=1:nrow(samples)
 
 ## save
@@ -301,7 +301,7 @@ samples=samples[keep,]
 
 ## posterior package to summarize
 library(posterior)
-sdraw=data.frame(summarise_draws(samples,mean=mean,~ quantile(.x, probs = c(.025, .975))))
+sdraw=data.frame(summarise_draws(samples,mean=mean,~ quantile(.x, probs = c(.025, .975)),rhat=rhat))
 
 ## minimize 
 sdraw=sdraw[sdraw$variable%in%c("lambda0","lambda1","mu0","mu1","q01","q10"),]
@@ -314,7 +314,20 @@ colnames(qm)=rownames(qm)
 
 ## simplify
 tmp=samples[names(top$par)]
+tmp$sample=as.numeric(rownames(tmp))
 tmp=gather(tmp,par,est,head(names(top$par),1):tail(names(top$par),1))
+
+## check chains
+ggplot(tmp,aes(sample,est))+
+  facet_wrap(~par)+
+  th+
+  geom_line()
+
+## density
+ggplot(tmp,aes(est))+
+  facet_wrap(~par)+
+  th+
+  geom_density(fill="grey")
 
 ## fix par
 tmp$par2=revalue(tmp$par,
@@ -366,15 +379,21 @@ bisse_plot=ggplot(tmp,aes(par2,est,colour=type,fill=type))+
 rootn=c(1,0)
 names(rootn)=levels(factor(set$data$Synurbic))
 
+## clean large files
+rm(mod1,tmp,fit1,cfit1,cfit2,cfit3,cfit4,cfit5,cfit6,cfit7,cfit8)
+
 ## test
 set.seed(1)
-mk=make.simmap(uphy,bstate,Q=qm,nsim=5,pi=as.matrix(rootn))
+mk=make.simmap(uphy,bstate,Q=qm,nsim=1000,pi=as.matrix(rootn))
 
 ## summarize simmap
 simsum=summary(mk,plot=F)
 
 ## lineage-through-time
 lobj=ltt(mk,plot=F)
+
+## clean
+rm(mk)
 
 ## add sim identity and save as data
 lset=lapply(1:length(lobj),function(x){
@@ -406,6 +425,9 @@ lset=lapply(1:length(lobj),function(x){
   
 ## save as dataset
 lset=do.call(rbind.data.frame,lset)
+
+## clean
+rm(lobj)
 
 ## wide to long
 lset=tidyr::gather(lset,lin,number,natural:anthropogenic)
@@ -587,7 +609,7 @@ w=diff(sapply(tmp[names(top$par)],range))
 
 ## run the chain to get 95% CIs
 set.seed(1)
-samples=mcmc(tmodel,top$par,nsteps=1000,w=w,lower=0,prior=prior,print.every=0)
+samples=mcmc(tmodel,top$par,nsteps=2000,w=w,lower=0,prior=prior,print.every=0)
 samples$chain=1:nrow(samples)
 
 ## save
