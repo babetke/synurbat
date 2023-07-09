@@ -27,6 +27,9 @@ library(InformationValue)
 # read in rds
 data <- readRDS("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.rds")
 
+# lab comp
+# data <- readRDS("/Volumes/BETKE 2021/synurbat/flat files/cleaned dataset 30 cutoff.rds")
+
 # remove species col
 data <- data %>% 
   select(-c(species, det_inv, biogeographical_realm)) 
@@ -131,7 +134,7 @@ grid_search <- function(row, data_df, response, folds, nsplit){
              interaction.depth=hgrid$interaction.depth[row],
              n.minobsinnode=hgrid$n.minobsinnode[row],
              cv.folds=folds,
-             class.stratify.cv=FALSE,
+             class.stratify.cv=TRUE,
              bag.fraction=0.5,
              train.fraction=1,
              n.cores=1,
@@ -169,51 +172,75 @@ grid_search <- function(row, data_df, response, folds, nsplit){
               wrow=row))
 }
 
-hgrid <- makegrid(1, trees = seq(15000,50000,5000))
-
-# how many maxed out?
-grid_search_without_NAs %>% filter(best == n.trees) # 6, 3 each on 5000 and 10000 with shrinkage of 0.0005
-
-rgrid <- makegrid(1, c(15000, seq(20000, 50000, 10000))) #45, trimmed to not have 5000, or 10000 because they max out on
-
-# run for the two types of data?
-na.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = na.data, response="Synurbic", folds = 10, nsplit = "yes"))
-f.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = data, response="pseudo", folds = 10, nsplit = "yes"))
-
-## get results
-na.results <- data.frame(sapply(na.pars,function(x) x$trainAUC),
-                      sapply(na.pars,function(x) x$testAUC),
-                      sapply(na.pars,function(x) x$spec),
-                      sapply(na.pars,function(x) x$sen),
-                      sapply(na.pars,function(x) x$wrow),
-                      sapply(na.pars,function(x) x$best))
-names(na.results) <- c("trainAUC","testAUC",
-                    "spec","sen","row","best")
-
-# Merge with hgrid
-na.complete <- merge(na.results, hgrid, by = "row")
+# ifelse for running grid search function
+gsrun = "no" 
+if(gsrun == "yes"){# run grid search 
+  
+  hgrid <- makegrid(1, c(seq(5000, 25000, 5000)))
+  
+  # Removing combinations that constantly max out
+  hgrid %>% 
+    filter(!(n.trees == 5000 & shrinkage < 0.001)) %>%
+    filter(!(n.trees == 10000 & shrinkage < 0.001)) -> hgrid
+  
+  # renumber the rows for matching 
+  hgrid$row <- 1:nrow(hgrid)
+  
+  # run for the two types of data?
+  na.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = na.data, response="Synurbic", folds = 10, nsplit = "yes"))
+  #f.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = data, response="pseudo", folds = 10, nsplit = "yes"))
+  
+  ## get results
+  na.results <- data.frame(sapply(na.pars,function(x) x$trainAUC),
+                        sapply(na.pars,function(x) x$testAUC),
+                        sapply(na.pars,function(x) x$spec),
+                        sapply(na.pars,function(x) x$sen),
+                        sapply(na.pars,function(x) x$wrow),
+                        sapply(na.pars,function(x) x$best))
+  names(na.results) <- c("trainAUC","testAUC",
+                      "spec","sen","row","best")
+  
+  # Merge with hgrid
+  na.complete <- merge(na.results, hgrid, by = "row")
+  
+  # write as csv
+  write_csv(na.complete, "/Volumes/BETKE 2021/synurbat/flat files/grid search without NAs.csv")
+  
+} else {# read in grid search results
+  na.complete <- read_csv("~/Desktop/Synurbic_Bats/synurbat/flat files/grid search without NAs.csv")
+  # na.complete <- read_csv("/Volumes/BETKE 2021/synurbat/flat files/grid search without NAs.csv")
+}
 
 # Plot of parameters
+# sen_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = sen)) +
+#   geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+#   theme_classic() +
+#   labs(x = "Shrinkage", y = "Sensitivity", fill = "Interaction Depth") +
+#   theme(legend.position = "none")
+# 
+# spec_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = spec)) +
+#   geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+#   theme_classic() +
+#   labs(x = "Shrinkage", y = "Specificity", fill = "Interaction Depth")
+
 auc_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = testAUC)) +
   geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
-  theme_classic() +
-  labs(x = "Shrinkage", y = "AUC", fill = "Interaction Depth") +
-  theme(legend.position = "none")
+  theme_bw() +
+  labs(x = "Learning Rate", y = "AUC", fill = "Interaction Depth") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        legend.position = "none")
 
-sen_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = sen)) +
+tree_gg <- ggplot(na.complete, aes(x = factor(n.trees), y = testAUC)) +
   geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
-  theme_classic() +
-  labs(x = "Shrinkage", y = "Sensitivity", fill = "Interaction Depth") +
-  theme(legend.position = "none")
-
-spec_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = spec)) +
-  geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
-  theme_classic() +
-  labs(x = "Shrinkage", y = "Specificity", fill = "Interaction Depth")
-
+  theme_bw() +
+  labs(x = "No.Trees", y = NULL, fill = "Interaction Depth") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+  
 library(patchwork) # multiplot and save
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/parameters no NAs.png", width=15,height=5,units="in",res=600)
-auc_gg + sen_gg + spec_gg 
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S4.png", width=7,height=3.5,units="in",res=600)
+auc_gg + tree_gg + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 dev.off()
 
 # remove
@@ -222,8 +249,9 @@ rm(auc_gg, sen_gg, spec_gg)
 # unload patchwork
 detach("package:patchwork", unload = TRUE)
 
-# write as csv
-write_csv(na.complete, "/Volumes/BETKE 2021/synurbat/flat files/grid search without NAs.csv")
+# Sort output to view top model combinations
+sort <- na.complete %>% 
+  arrange(desc(testAUC))
 
 # Define BRT function 
 # take a specified dataset
@@ -231,7 +259,7 @@ write_csv(na.complete, "/Volumes/BETKE 2021/synurbat/flat files/grid search with
 # maybe build in some options to change the split section - keep from analysis before but maybe add a if else 
 
 # Basic gbm functions from virus analysis - the innerds of partition function w/out partitions 
-get_brt <- function(data_df, response, nt, shr, int.d, folds, nsplit, seed=NULL) {
+get_brt <- function(data_df, response, nt, shr, int.d, nsplit, seed=NULL) {
   
   # rename dataset
   ndata <- data_df
@@ -326,13 +354,14 @@ get_brt <- function(data_df, response, nt, shr, int.d, folds, nsplit, seed=NULL)
 }
 
 # Run BRTs
-noNA_gbm <- get_brt(data_df = na.data, response = "Synurbic", nt = 10000, shr = 0.001, int.d = 4, nsplit = "yes")
-pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 10000, shr = 0.001, int.d = 4, nsplit = "yes")
+noNA_gbm <- get_brt(data_df = na.data, response = "Synurbic", nt = 20000, shr = 0.0005, int.d = 4, nsplit = "yes")
+pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 20000, shr = 0.0005, int.d = 4, nsplit = "yes")
 
 # Save 
 saveRDS(noNA_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")
 saveRDS(pseudo_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/pseudo_brts.rds")
 
-
-
+# # save
+# saveRDS(noNA_gbm,"/Volumes/BETKE 2021/synurbat/flat files/noNA_brts.rds")
+# saveRDS(pseudo_gbm,"/Volumes/BETKE 2021/synurbat/flat files/pseudo_brts.rds")
 

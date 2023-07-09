@@ -171,7 +171,7 @@ dev.off()
 mval$keep=ifelse(mval$comp>=0.30,"keep","cut")
 table(mval$keep)
 # cut keep 
-# 18   66 
+# 18   70 
 
 ## order
 mval=mval[order(mval$comp),]
@@ -184,7 +184,8 @@ coverage_table <- mval %>%
          Coverage = comp) %>%
   filter(!Variable %in% c("clade", "gen", "tip", "species", "fam", "virus", "zvirus", "Complete")) %>%
   select(-keep) %>%
-  relocate(Coverage, .after = Variable)
+  relocate(Coverage, .after = Variable) %>%
+  arrange(desc(Coverage))
 
 rownames(coverage_table) <- NULL
 

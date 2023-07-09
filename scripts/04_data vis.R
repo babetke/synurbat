@@ -42,7 +42,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                            "litters_per_year_n" = "Litters Per Year",
                            "adult_body_length_mm" = "Adult Body Length",
                            "X28.2_Temp_Mean_01degC" = "Mean Monthly Temperature",
-                           "X27.2_HuPopDen_Mean_n.km2" = "Mean Human Population Density",
+                           "X27.2_HuPopDen_Mean_n.km2" = "Mean Human Density",
                            "X28.1_Precip_Mean_mm" = "Mean Monthly Precipitation",
                            "litter_size_n" = "Litter Size",
                            "upper_elevation_m" = "Upper Elevation Limit",
@@ -59,18 +59,18 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                            "det_diet_breadth_n" = "Diet Breadth",
                            "X26.6_GR_MinLong_dd" = "Minimum Longitude",
                            "det_vend" = "Diet Vend",
-                           "X27.1_HuPopDen_Min_n.km2" = "Min Human Population Density",
+                           "X27.1_HuPopDen_Min_n.km2" = "Min Human Density",
                            "dphy_vertebrate" = "Diet Vertebrate",
                            "lower_elevation_m" = "Lower Elevation Limit",
                            "det_nect" = "Diet Nectar",
-                           "X27.4_HuPopDen_Change" = "Human Population Density Change",
-                           "X27.3_HuPopDen_5p_n.km2" = "Human Population Density 5th Percentile",
+                           "X27.4_HuPopDen_Change" = "Human Density Change",
+                           "X27.3_HuPopDen_5p_n.km2" = "Human Density 5th Percentile",
                            "X26.7_GR_MidRangeLong_dd" = "Median Longitudinal Range",
                            "det_fruit" = "Diet Fruit",
                            "fam_PHYLLOSTOMIDAE" = "Phyllostomidae",
                            "det_vect" = "Diet Vect",
                            "trophic_level" = "Trophic Level",
-                           "dphy_invertebrate" = "Diet Invertebrate (dypy)",
+                           "dphy_invertebrate" = "Diet Invertebrate",
                            "island_dwelling" = "Island Dwelling",
                            "fam_MOLOSSIDAE" = "Molossidae",
                            "fam_MINIOPTERIDAE" = "Miniopteridae",
@@ -97,9 +97,14 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
       labs(x = " ", y = "Relative Importance") +
       coord_flip() +
       theme(legend.position = c(0.80, 0.15),
+            legend.text = element_text(size = 7),
+            legend.title = element_text(size=7),
             panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank())
-    
+            panel.grid.minor = element_blank()) +
+      theme(axis.text.y=element_text(size=7),
+            axis.text.x=element_text(size=7),
+            axis.title=element_text(size=9))
+  
   } else {
   # pull rinf
   rds_vars1 <- rds_name1[["rinf"]]
@@ -119,7 +124,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                          "litters_per_year_n" = "Litters Per Year",
                          "adult_body_length_mm" = "Adult Body Length",
                          "X28.2_Temp_Mean_01degC" = "Mean Monthly Temperature",
-                         "X27.2_HuPopDen_Mean_n.km2" = "Mean Human Population Density",
+                         "X27.2_HuPopDen_Mean_n.km2" = "Mean Human Density",
                          "X28.1_Precip_Mean_mm" = "Mean Monthly Precipitation",
                          "litter_size_n" = "Litter Size",
                          "upper_elevation_m" = "Upper Elevation Limit",
@@ -136,18 +141,18 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                          "det_diet_breadth_n" = "Diet Breadth",
                          "X26.6_GR_MinLong_dd" = "Minimum Longitude",
                          "det_vend" = "Diet Vend",
-                         "X27.1_HuPopDen_Min_n.km2" = "Min Human Population Density",
+                         "X27.1_HuPopDen_Min_n.km2" = "Min Human Density",
                          "dphy_vertebrate" = "Diet Vertebrate",
                          "lower_elevation_m" = "Lower Elevation Limit",
                          "det_nect" = "Diet Nectar",
-                         "X27.4_HuPopDen_Change" = "Human Population Density Change",
-                         "X27.3_HuPopDen_5p_n.km2" = "Human Population Density 5th Percentile",
+                         "X27.4_HuPopDen_Change" = "Human Density Change",
+                         "X27.3_HuPopDen_5p_n.km2" = "Human Density 5th Percentile",
                          "X26.7_GR_MidRangeLong_dd" = "Median Longitudinal Range",
                          "det_fruit" = "Diet Fruit",
                          "fam_PHYLLOSTOMIDAE" = "Phyllostomidae",
                          "det_vect" = "Diet Vect",
                          "trophic_level" = "Trophic Level",
-                         "dphy_invertebrate" = "Diet Invertebrate (dypy)",
+                         "dphy_invertebrate" = "Diet Invertebrate",
                          "island_dwelling" = "Island Dwelling",
                          "fam_MOLOSSIDAE" = "Molossidae",
                          "fam_MINIOPTERIDAE" = "Miniopteridae",
@@ -166,13 +171,16 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                          "population_trend" = "Population Trend"
   )
   
+  # correlation coeff
+  rho <- cor.test(rds_vars$rel.inf.x, rds_vars$rel.inf.y, method = "pearson")
+  
   # update names
   rds_vars <- rds_vars %>% 
     rename(Initial = rel.inf.x,
            Pseudoabsence = rel.inf.y)
   
   # points
-  ggplot(rds_vars) + 
+  var.inf <- ggplot(rds_vars) + 
     #geom_crossbar(aes(ymin = avg-rse, ymax = avg+rse), alpha = 0.5) +
     geom_point(aes(x = reorder(var, Initial), y = Pseudoabsence, color = "Pseudoabsence"), stat = "identity", alpha = 0.5, size = 3) +
     geom_point(aes(x = reorder(var, Initial), y = Initial, color = "Initial"), stat = "identity", alpha = 0.75, size = 2) +
@@ -180,7 +188,45 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
     theme_bw() +
     labs(x = " ", y = "Relative Importance") +
     coord_flip() +
-    scale_color_manual(values = c("Initial" = "black", "Pseudoabsence" = "orange"))
+    scale_color_manual(values = c("Initial" = "black", "Pseudoabsence" = "orange")) +
+    theme(panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank())
+  
+  var.inf <- var.inf + theme(legend.position = "bottom",
+                             legend.text = element_text(size = 8),
+                             legend.title = element_text(size = 8),
+                             axis.text = element_text(size = 8),
+                             axis.title=element_text(size = 10))
+  
+  # scatter plot
+  ranks_gg <- ggplot(rds_vars, aes(x = Initial, y = Pseudoabsence, label = var)) +
+    geom_text_repel(size = 2) +
+    geom_point() +
+    xlim(limits = c(0, 12.48)) +
+    #geom_jitter() +
+    #scale_x_reverse(limits = c(12.48, 0)) +
+    #scale_y_reverse() +
+    geom_abline(intercept = 0, slope = 1) +
+    labs(x = "Relative Importance for Initial", y = "Relative Importance for Pseudoabsence") +
+    theme_bw() +
+    theme(panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank()) +
+    theme(axis.text = element_text(size=6),
+          axis.title=element_text(size=8))
+  
+  # ranks_gg <- ranks_gg + theme(axis.text = element_text(size=5),
+  #                              axis.title=element_text(size=6))
+  
+  #multi <- (var.inf + ranks_gg + plot_layout(widths = c(0.75, 2.25)) & theme(plot.tag = element_text(size = 7))) + plot_annotation(tag_levels = "A")
+  
+  
+  # multi plot
+  #multi <- (var.inf + ranks_gg + plot_layout(widths = c(1, 2)) & theme(plot.tag = element_text(size = 8)))
+  # left <- var.inf & theme(plot.tag = element_text(size = 8))
+  # right <- ranks_gg & theme(plot.tag = element_text(size = 8))
+  # multi <- wrap_plots(left + right) + plot_annotation(tag_levels = 'A')
+  
+  #multi <- multi + plot_annotation(tag_levels = 'A')
   
   # bars
   # ggplot(rds_vars) + 
@@ -192,43 +238,47 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
   #   theme_bw() +
   #   labs(x = " ", y = "Relative Importance") +
   #   coord_flip()
+  
+  return(list(rho = rho,
+              var.inf = var.inf,
+              scatter = ranks_gg))
   }
   
 }
 
 # No NA only 
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/variable importance no NAs.png", width=6, height=7.5, units="in", res=300)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 2.png", width=5, height=6.5, units="in", res=300)
 inf_plot(noNA)
 dev.off()
 
-# both models
+# both models, scatter plot, and pearons rho
 rel_gg <- inf_plot(noNA, pseudo)
 
-#### Scatter plot
-rds_vars1 <- noNA[["rinf"]]
-rds_vars2 <- pseudo[["rinf"]]
+# view cor output
+rel_gg[["rho"]]
 
-# merge by variable name
-rds_vars <- merge(rds_vars1, rds_vars2, by = "var")
+# Pearson's product-moment correlation
+# 
+# data:  rds_vars$rel.inf.x and rds_vars$rel.inf.y
+# t = 24.841, df = 59, p-value < 2.2e-16
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.9264343 0.9730850
+# sample estimates:
+#       cor 
+# 0.9553714 
 
-ranks_gg <- ggplot(rds_vars, aes(x = rel.inf.x, y = rel.inf.y, label = var)) +
-  geom_text_repel() +
-  geom_jitter() +
-  labs(x = "Feature Rank for Initial Model (AUC = 0.93)", y = "Feature rank for Pseudoabsence Model (AUC = 0.95)") +
-  theme_bw()
-
-ranks2_gg <- ggplot(rds_vars, aes(x = rel.inf.x, y = rel.inf.y, label = var)) +
-  geom_text_repel() +
-  geom_jitter() +
-  scale_x_reverse(limits = c(12.92, 0)) +
-  scale_y_reverse() +
-  geom_abline(intercept = 0, slope = 1) +
-  labs(x = "Feature Rank for Initial Model (AUC = 0.93)", y = "Feature rank for Pseudoabsence Model (AUC = 0.95)") +
-  theme_bw()
-
-# multiplot of ranks and dotplots
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/feature rank comparisons.png", width=15,height=7,units="in",res=600)
-rel_gg + ranks2_gg + plot_layout(widths = c(1, 2))
+# or inset plot
+library(cowplot)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S1.png", width=6,height=7.5,units="in",res=300)
+ggdraw(rel_gg[["var.inf"]]) +
+  draw_plot(rel_gg[["scatter"]], .55, .15, .40, .30) +
+  draw_plot_label(
+    c("A", "B"),
+    c(0, 0.50),
+    c(1, 0.45),
+    size = 12
+  )
 dev.off()
 
 #### Functions for patial dependence plots
@@ -327,52 +377,49 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
 
 ## Plot partial dependence
 # No NA pdps
-hb <- make_pdp_cont(noNA,"habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
 gr <- make_pdp_cont(noNA, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = FALSE)
-at <- make_pdp_cont(noNA, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
+hb <- make_pdp_cont(noNA,"habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
 pm <- make_pdp_cont(noNA, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = FALSE)
+at <- make_pdp_cont(noNA, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
 ls <- make_pdp_cont(noNA, "litter_size_n", "Litter Size", pcolor = FALSE)
-fr <- make_pdp_cont(noNA, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
-fa <- make_pdp_cont(noNA, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = FALSE)
+mp <- make_pdp_cont(noNA, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = FALSE)
 am <- make_pdp_cont(noNA, "adult_mass_g","Adult Mass (g)", pcolor = FALSE)
-bl <- make_pdp_cont(noNA, "adult_body_length_mm", "Adult Body Length", pcolor = FALSE)
-ml <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = FALSE)
-mx <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd", "Maximum Latitude", pcolor = FALSE)
-di <- make_pdp_cont(noNA, "dphy_invertebrate", "Diet Invertebrate (%)", pcolor = FALSE)
-hp <- make_pdp_cont(noNA, "X27.2_HuPopDen_Mean_n.km2", "Mean Human Population Density", pcolor = FALSE)
 dp <- make_pdp_cont(noNA, "dphy_plant","Diet Plants (%)", pcolor = FALSE)
+bl <- make_pdp_cont(noNA, "adult_body_length_mm", "Adult Body Length", pcolor = FALSE)
+fa <- make_pdp_cont(noNA, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = FALSE)
+mx <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd", "Maximum Latitude", pcolor = FALSE)
 cs <- make_pdp_fact(noNA, "category", "Conservation Status", pcolor = FALSE)
+fr <- make_pdp_cont(noNA, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
+hp <- make_pdp_cont(noNA, "X27.2_HuPopDen_Mean_n.km2", "Mean Human Density", pcolor = FALSE)
+ml <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = FALSE)
 
 # Save
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 15 no NAs.png", width=7,height=8,units="in",res=600)
-hb + gr + at + pm + ls + fr + fa + am + bl + ml + mx + di + hp + dp + cs + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 3.png", width=7,height=7.5,units="in",res=300)
+gr + hb + pm + at + ls + mp + am + dp + bl + fa + mx + cs + fr + hp + ml + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 9 no NAs.png", width=10,height=8,units="in",res=600)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 9 no NAs.png", width=10,height=8,units="in",res=300)
 hb + gr + at + pm + ls + fr + fa + am + bl + plot_layout(nrow = 3, ncol = 3, byrow = TRUE)
 dev.off()
 
 #  Pseudo model pdps 
 phb <- make_pdp_cont(pseudo,"habitat_breadth_n", "Habitat Breadth", pcolor = TRUE)
 pgr <- make_pdp_cont(pseudo, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = TRUE)
+ppm <- make_pdp_cont(pseudo, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
 pat <- make_pdp_cont(pseudo, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = TRUE)
 pls <- make_pdp_cont(pseudo, "litter_size_n", "Litter Size", pcolor = TRUE)
-ppm <- make_pdp_cont(pseudo, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
-pcc <- make_pdp_cont(pseudo, "cites","Citation Count", pcolor = TRUE)
-pml <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
 pmx <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Maximum Latitude", pcolor = TRUE)
-pam <- make_pdp_cont(pseudo, "adult_mass_g","Adult Mass (g)", pcolor = TRUE)
-pfa <- make_pdp_cont(pseudo, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = TRUE)
-pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
-php <- make_pdp_cont(pseudo, "X27.2_HuPopDen_Mean_n.km2", "Mean Human Population Density", pcolor = TRUE)
-pbl <- make_pdp_cont(pseudo, "adult_body_length_mm", "Adult Body Length", pcolor = TRUE)
 pcs <- make_pdp_fact(pseudo, "category", "Conservation Status", pcolor = TRUE)
-pdi <- make_pdp_cont(noNA, "dphy_invertebrate", "Diet Invertebrate (%)", pcolor = TRUE)
+pcc <- make_pdp_cont(pseudo, "cites","Citation Count", pcolor = TRUE)
+pam <- make_pdp_cont(pseudo, "adult_mass_g","Adult Mass (g)", pcolor = TRUE)
+ppt <- make_pdp_cont(pseudo, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = TRUE)
+pdp <- make_pdp_cont(pseudo, "dphy_plant","Diet Plants (%)", pcolor = TRUE)
+pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
+pml <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
+pfa <- make_pdp_cont(pseudo, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = TRUE)
 
 # Save
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 15 pseudo model.png", width=7,height=8,units="in",res=600)
-phb + pgr + pat + pls + ppm + pcc + pml + pmx + pam + pfa + pfr + php + pbl + pcs + pdi + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=600)
+phb + pgr + pat + ppm + pat + pls + pmx + pcs + pcc + pam + ppt + pdp + pfr + pml + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
-
-
 
