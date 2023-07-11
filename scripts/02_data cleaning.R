@@ -101,9 +101,9 @@ rm(temp, temp_wide)
 #### Factor COMBINE and remove unnecessary columns
 data <- data %>% # Synurbic and variables that are factors according to COMBINE
   mutate(across(c("Synurbic","hibernation_torpor","fossoriality","trophic_level",
-                  "foraging_stratum","activity_cycle", "freshwater", 
+                  "foraging_stratum","activity_cycle","freshwater", 
                   "marine","terrestrial_non-volant", "terrestrial_volant","island_endemicity",
-                  "disected_by_mountains", "glaciation", "biogeographical_realm", "category", "population_trend"), 
+                  "disected_by_mountains", "glaciation","biogeographical_realm", "category", "population_trend"), 
                 factor)) %>% 
   select(-c("MSW3_sciName_matched"))
 
@@ -155,7 +155,7 @@ names(mval)=c("comp","column")
 mval$comp=round(mval$comp,2)
 
 # ggplot of coverage
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/trait_coverage.png", width=9.5,height=5.5,units="in",res=600)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/trait_coverage.png", width=9.5,height=5.5,units="in",res=600)
 mval %>% 
   filter(!column %in% c("fam","tip", "gen", "cites", "iucn2020_binomial")) %>%
   ggplot(aes(comp)) +
@@ -182,7 +182,7 @@ coverage_table <- mval %>%
   filter(keep == "keep") %>%
   rename(Variable = column,
          Coverage = comp) %>%
-  filter(!Variable %in% c("clade", "gen", "tip", "species", "fam", "virus", "zvirus", "Complete")) %>%
+  filter(!Variable %in% c("clade", "gen", "tip", "species", "fam", "virus", "zvirus", "Complete","biogeographical_realm", "iucn2020_binomial")) %>%
   select(-keep) %>%
   relocate(Coverage, .after = Variable) %>%
   arrange(desc(Coverage))

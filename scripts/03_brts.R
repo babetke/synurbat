@@ -190,7 +190,7 @@ if(gsrun == "yes"){# run grid search
   na.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = na.data, response="Synurbic", folds = 10, nsplit = "yes"))
   #f.pars <- lapply(1:nrow(hgrid),function(x) grid_search(x, data_df = data, response="pseudo", folds = 10, nsplit = "yes"))
   
-  ## get results
+  ## get results for main text/initial model
   na.results <- data.frame(sapply(na.pars,function(x) x$trainAUC),
                         sapply(na.pars,function(x) x$testAUC),
                         sapply(na.pars,function(x) x$spec),
@@ -206,8 +206,25 @@ if(gsrun == "yes"){# run grid search
   # write as csv
   write_csv(na.complete, "/Volumes/BETKE 2021/synurbat/flat files/grid search without NAs.csv")
   
+  ## get results for pseudo model
+  p.results <- data.frame(sapply(p.pars,function(x) x$trainAUC),
+                          sapply(p.pars,function(x) x$testAUC),
+                          sapply(p.pars,function(x) x$spec),
+                          sapply(p.pars,function(x) x$sen),
+                          sapply(p.pars,function(x) x$wrow),
+                          sapply(p.pars,function(x) x$best))
+  names(p.results) <- c("trainAUC","testAUC",
+                        "spec","sen","row","best")
+  
+  # Merge with hgrid
+  p.complete <- merge(p.results, hgrid, by = "row")
+  
+  # write as csv
+  write_csv(p.complete, "/Volumes/BETKE 2021/synurbat/flat files/grid search pseudo.csv")
+  
 } else {# read in grid search results
   na.complete <- read_csv("~/Desktop/Synurbic_Bats/synurbat/flat files/grid search without NAs.csv")
+  p.complete <- read_csv("~/Desktop/Synurbic_Bats/synurbat/flat files/grid search pseudo.csv")
   # na.complete <- read_csv("/Volumes/BETKE 2021/synurbat/flat files/grid search without NAs.csv")
 }
 
@@ -226,25 +243,57 @@ if(gsrun == "yes"){# run grid search
 auc_gg <- ggplot(na.complete, aes(x = factor(shrinkage), y = testAUC)) +
   geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
   theme_bw() +
-  labs(x = "Learning Rate", y = "AUC", fill = "Interaction Depth") +
+  labs(x = "Learning Rate", y = "AUC", fill = "Interaction Depth", title = "Initial Model") +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(), 
-        legend.position = "none")
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none",
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 10)) +
+  scale_fill_brewer(palette="Accent")
 
 tree_gg <- ggplot(na.complete, aes(x = factor(n.trees), y = testAUC)) +
   geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
   theme_bw() +
+  labs(x = "No.Trees", y = "AUC", fill = "Interaction Depth") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 10)) +
+  scale_fill_brewer(palette="Accent")
+  
+pauc_gg <- ggplot(p.complete, aes(x = factor(shrinkage), y = testAUC)) +
+  geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+  theme_bw() +
+  labs(x = "Learning Rate", y = NULL, fill = "Interaction Depth", title = "Pseudoabsence Model") +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        plot.title = element_text(hjust = 0.5, size = 12),
+        legend.position = "none",
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 10)) +
+  scale_fill_brewer(palette="Accent")
+
+ptree_gg <- ggplot(p.complete, aes(x = factor(n.trees), y = testAUC)) +
+  geom_boxplot(aes(fill = factor(interaction.depth)), color = "black", alpha = 0.5) +
+  theme_bw() +
   labs(x = "No.Trees", y = NULL, fill = "Interaction Depth") +
   theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-  
+        panel.grid.minor = element_blank(),
+        legend.position = "none",
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 10)) +
+  scale_fill_brewer(palette="Accent")
+
 library(patchwork) # multiplot and save
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S4.png", width=7,height=3.5,units="in",res=600)
-auc_gg + tree_gg + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S4.png", width=6, height=6,units="in",res=300)
+guide_area () + 
+  (auc_gg + pauc_gg) / (tree_gg + ptree_gg) + 
+  plot_layout(guides = "collect", heights = c(1, 15)) & theme(legend.position = "top")
 dev.off()
 
 # remove
-rm(auc_gg, sen_gg, spec_gg)
+rm(auc_gg, tree_gg, pauc_gg, ptree_gg)
 
 # unload patchwork
 detach("package:patchwork", unload = TRUE)
@@ -252,6 +301,13 @@ detach("package:patchwork", unload = TRUE)
 # Sort output to view top model combinations
 sort <- na.complete %>% 
   arrange(desc(testAUC))
+
+# Sort output to view top model combinations
+psort <- p.complete %>% 
+  arrange(desc(testAUC))
+
+# remove sorts
+rm(sort, psort)
 
 # Define BRT function 
 # take a specified dataset
@@ -355,7 +411,7 @@ get_brt <- function(data_df, response, nt, shr, int.d, nsplit, seed=NULL) {
 
 # Run BRTs
 noNA_gbm <- get_brt(data_df = na.data, response = "Synurbic", nt = 20000, shr = 0.0005, int.d = 4, nsplit = "yes")
-pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 20000, shr = 0.0005, int.d = 4, nsplit = "yes")
+pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 25000, shr = 0.001, int.d = 4, nsplit = "yes")
 
 # Save 
 saveRDS(noNA_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")

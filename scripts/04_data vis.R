@@ -91,19 +91,19 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
     
     # plot points
     ggplot(rds_vars) +
-      geom_point(aes(x = reorder(var, rel.inf), y = rel.inf, color = type), stat = "identity", alpha = 0.75, size = 3) +
+      geom_point(aes(x = reorder(var, rel.inf/100), y = rel.inf/100, color = type), stat = "identity", alpha = 0.75, size = 3) +
       theme(axis.text.x = element_text(size = 10, hjust = 1)) +
       theme_bw() +
-      labs(x = " ", y = "Relative Importance") +
+      labs(x = " ", y = "Relative Importance (%)") +
       coord_flip() +
       theme(legend.position = c(0.80, 0.15),
-            legend.text = element_text(size = 7),
-            legend.title = element_text(size=7),
+            legend.text = element_text(size=6.5),
+            legend.title = element_text(size=6.5),
             panel.grid.major = element_blank(),
             panel.grid.minor = element_blank()) +
-      theme(axis.text.y=element_text(size=7),
-            axis.text.x=element_text(size=7),
-            axis.title=element_text(size=9))
+      theme(axis.text.y=element_text(size=6.5),
+            axis.text.x=element_text(size=6.5),
+            axis.title=element_text(size=8.5))
   
   } else {
   # pull rinf
@@ -179,40 +179,44 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
     rename(Initial = rel.inf.x,
            Pseudoabsence = rel.inf.y)
   
+  rds_vars <- rds_vars %>% 
+    mutate(i_imp = Initial/100, 
+           p_imp = Pseudoabsence/100)
+  
   # points
   var.inf <- ggplot(rds_vars) + 
     #geom_crossbar(aes(ymin = avg-rse, ymax = avg+rse), alpha = 0.5) +
-    geom_point(aes(x = reorder(var, Initial), y = Pseudoabsence, color = "Pseudoabsence"), stat = "identity", alpha = 0.5, size = 3) +
-    geom_point(aes(x = reorder(var, Initial), y = Initial, color = "Initial"), stat = "identity", alpha = 0.75, size = 2) +
+    geom_point(aes(x = reorder(var, i_imp), y = p_imp, color = "Pseudoabsence"), stat = "identity", alpha = 0.5, size = 3) +
+    geom_point(aes(x = reorder(var, i_imp), y = i_imp, color = "Initial"), stat = "identity", alpha = 0.75, size = 2) +
     theme(axis.text.x = element_text(size = 10, hjust = 1)) +
     theme_bw() +
-    labs(x = " ", y = "Relative Importance") +
+    labs(x = " ", y = "Relative Importance (%)") +
     coord_flip() +
     scale_color_manual(values = c("Initial" = "black", "Pseudoabsence" = "orange")) +
     theme(panel.grid.major=element_blank(),
           panel.grid.minor=element_blank())
   
   var.inf <- var.inf + theme(legend.position = "bottom",
-                             legend.text = element_text(size = 8),
-                             legend.title = element_text(size = 8),
-                             axis.text = element_text(size = 8),
-                             axis.title=element_text(size = 10))
+                             legend.text = element_text(size = 6),
+                             legend.title = element_text(size = 6),
+                             axis.text = element_text(size = 6),
+                             axis.title=element_text(size = 8))
   
   # scatter plot
-  ranks_gg <- ggplot(rds_vars, aes(x = Initial, y = Pseudoabsence, label = var)) +
+  ranks_gg <- ggplot(rds_vars, aes(x = i_imp, y = p_imp, label = var)) +
     geom_text_repel(size = 2) +
     geom_point() +
-    xlim(limits = c(0, 12.48)) +
+    xlim(limits = c(0, 0.1236)) +
     #geom_jitter() +
     #scale_x_reverse(limits = c(12.48, 0)) +
     #scale_y_reverse() +
     geom_abline(intercept = 0, slope = 1) +
-    labs(x = "Relative Importance for Initial", y = "Relative Importance for Pseudoabsence") +
+    labs(x = "Initial Relative Importance", y = "Pseudoabsence Relative Importance") +
     theme_bw() +
     theme(panel.grid.major=element_blank(),
           panel.grid.minor=element_blank()) +
     theme(axis.text = element_text(size=6),
-          axis.title=element_text(size=8))
+          axis.title=element_text(size=7))
   
   # ranks_gg <- ranks_gg + theme(axis.text = element_text(size=5),
   #                              axis.title=element_text(size=6))
@@ -247,7 +251,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
 }
 
 # No NA only 
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 2.png", width=5, height=6.5, units="in", res=300)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 2.png", width=4.5, height=6, units="in", res=300)
 inf_plot(noNA)
 dev.off()
 
@@ -270,14 +274,14 @@ rel_gg[["rho"]]
 
 # or inset plot
 library(cowplot)
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S1.png", width=6,height=7.5,units="in",res=300)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S1.png", width=5,height=6,units="in",res=300)
 ggdraw(rel_gg[["var.inf"]]) +
-  draw_plot(rel_gg[["scatter"]], .55, .15, .40, .30) +
+  draw_plot(rel_gg[["scatter"]], .55, .17, .42, .32) + # side to side, up and down, width, height
   draw_plot_label(
     c("A", "B"),
-    c(0, 0.50),
-    c(1, 0.45),
-    size = 12
+    c(0, 0.50), # moves A label around
+    c(1, 0.50), # moves B label around
+    size = 10
   )
 dev.off()
 
@@ -419,7 +423,7 @@ pml <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = 
 pfa <- make_pdp_cont(pseudo, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = TRUE)
 
 # Save
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=600)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=300)
 phb + pgr + pat + ppm + pat + pls + pmx + pcs + pcc + pam + ppt + pdp + pfr + pml + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
