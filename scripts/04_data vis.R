@@ -94,7 +94,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
       geom_point(aes(x = reorder(var, rel.inf/100), y = rel.inf/100, color = type), stat = "identity", alpha = 0.75, size = 3) +
       theme(axis.text.x = element_text(size = 10, hjust = 1)) +
       theme_bw() +
-      labs(x = " ", y = "Relative Importance (%)") +
+      labs(x = " ", y = "Relative Importance") +
       coord_flip() +
       theme(legend.position = c(0.80, 0.15),
             legend.text = element_text(size=6.5),
@@ -103,7 +103,8 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
             panel.grid.minor = element_blank()) +
       theme(axis.text.y=element_text(size=6.5),
             axis.text.x=element_text(size=6.5),
-            axis.title=element_text(size=8.5))
+            axis.title=element_text(size=8.5)) +
+      scale_y_continuous(labels = scales::percent)
   
   } else {
   # pull rinf
@@ -190,11 +191,12 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
     geom_point(aes(x = reorder(var, i_imp), y = i_imp, color = "Initial"), stat = "identity", alpha = 0.75, size = 2) +
     theme(axis.text.x = element_text(size = 10, hjust = 1)) +
     theme_bw() +
-    labs(x = " ", y = "Relative Importance (%)") +
+    labs(x = " ", y = "Relative Importance") +
     coord_flip() +
     scale_color_manual(values = c("Initial" = "black", "Pseudoabsence" = "orange")) +
     theme(panel.grid.major=element_blank(),
-          panel.grid.minor=element_blank())
+          panel.grid.minor=element_blank()) +
+    scale_y_continuous(labels = scales::percent)
   
   var.inf <- var.inf + theme(legend.position = "bottom",
                              legend.text = element_text(size = 6),
@@ -206,7 +208,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
   ranks_gg <- ggplot(rds_vars, aes(x = i_imp, y = p_imp, label = var)) +
     geom_text_repel(size = 2) +
     geom_point() +
-    xlim(limits = c(0, 0.1236)) +
+    #xlim(limits = c(0, 12.36)) +
     #geom_jitter() +
     #scale_x_reverse(limits = c(12.48, 0)) +
     #scale_y_reverse() +
@@ -216,7 +218,9 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
     theme(panel.grid.major=element_blank(),
           panel.grid.minor=element_blank()) +
     theme(axis.text = element_text(size=6),
-          axis.title=element_text(size=7))
+          axis.title=element_text(size=7)) +
+    scale_x_continuous(labels = scales::percent, limits = c(0, 0.1236)) +
+    scale_y_continuous(labels = scales::percent)
   
   # ranks_gg <- ranks_gg + theme(axis.text = element_text(size=5),
   #                              axis.title=element_text(size=6))
@@ -251,7 +255,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
 }
 
 # No NA only 
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 2.png", width=4.5, height=6, units="in", res=300)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 2.png", width=4.5, height=5.75, units="in", res=300)
 inf_plot(noNA)
 dev.off()
 
