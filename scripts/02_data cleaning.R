@@ -137,7 +137,7 @@ vars <- vars[order(vars$keep),]
 
 table(vars$keep)
 # cut keep 
-# 18   80
+# 18   84
 
 ## trim
 keeps <- vars[-which(vars$keep=="cut"),]$column

@@ -219,7 +219,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
           panel.grid.minor=element_blank()) +
     theme(axis.text = element_text(size=6),
           axis.title=element_text(size=7)) +
-    scale_x_continuous(labels = scales::percent, limits = c(0, 0.1236)) +
+    scale_x_continuous(labels = scales::percent, limits = c(0, 0.1252)) +
     scale_y_continuous(labels = scales::percent)
   
   # ranks_gg <- ranks_gg + theme(axis.text = element_text(size=5),
@@ -268,17 +268,17 @@ rel_gg[["rho"]]
 # Pearson's product-moment correlation
 # 
 # data:  rds_vars$rel.inf.x and rds_vars$rel.inf.y
-# t = 24.841, df = 59, p-value < 2.2e-16
+# t = 24.337, df = 59, p-value < 2.2e-16
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.9264343 0.9730850
+#  0.9236110 0.9720261
 # sample estimates:
 #       cor 
-# 0.9553714 
+# 0.9536318 
 
 # or inset plot
 library(cowplot)
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S1.png", width=5,height=6,units="in",res=300)
+png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S1.png", width=4.5,height=6,units="in",res=300)
 ggdraw(rel_gg[["var.inf"]]) +
   draw_plot(rel_gg[["scatter"]], .55, .17, .42, .32) + # side to side, up and down, width, height
   draw_plot_label(
@@ -348,7 +348,7 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
   yrange = range(vals$y, na.rm = TRUE)
   
   # pull counts for color
-  df_cat <- as.data.frame(table(noNA[["testdata"]][[predictor]]))
+  df_cat <- as.data.frame(table(model[["testdata"]][[predictor]]))
   
   # fix y axis point
   df_cat$ymin <- yrange[1]-0.01
@@ -356,7 +356,7 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
   if(pcolor == FALSE){ #greys for initial model
     
     ggplot() +
-      geom_point(data = vals, size= 2, shape=15, aes(category, y)) +
+      geom_point(data = vals, size= 2, shape=15, aes(!!sym(predictor), y)) +
       geom_point(data = df_cat, aes(Var1, ymin, color = Freq)) +
       scale_color_continuous(high = "#636363", low = "#D9D9D9", guide = "none") +
       labs(x = var_name, y = "Marginal Effect") +
@@ -369,7 +369,7 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
   }else{ #different color for pseudoab variables
     
     ggplot() +
-      geom_point(data = vals, size= 2, shape=15, aes(category, y)) +
+      geom_point(data = vals, size= 2, shape=15, aes(!!sym(predictor), y)) +
       geom_point(data = df_cat, aes(Var1, ymin, color = Freq)) +
       scale_color_continuous(high = "#8C2D04", low = "#FEE6CE", guide = "none") +
       labs(x = var_name, y = "Marginal Effect") +
@@ -385,49 +385,50 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
 
 ## Plot partial dependence
 # No NA pdps
-gr <- make_pdp_cont(noNA, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = FALSE)
 hb <- make_pdp_cont(noNA,"habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
+gr <- make_pdp_cont(noNA, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = FALSE)
 pm <- make_pdp_cont(noNA, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = FALSE)
 at <- make_pdp_cont(noNA, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
 ls <- make_pdp_cont(noNA, "litter_size_n", "Litter Size", pcolor = FALSE)
 mp <- make_pdp_cont(noNA, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = FALSE)
+bl <- make_pdp_cont(noNA, "adult_body_length_mm", "Adult Body Length", pcolor = FALSE)
 am <- make_pdp_cont(noNA, "adult_mass_g","Adult Mass (g)", pcolor = FALSE)
 dp <- make_pdp_cont(noNA, "dphy_plant","Diet Plants (%)", pcolor = FALSE)
-bl <- make_pdp_cont(noNA, "adult_body_length_mm", "Adult Body Length", pcolor = FALSE)
-fa <- make_pdp_cont(noNA, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = FALSE)
-mx <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd", "Maximum Latitude", pcolor = FALSE)
-cs <- make_pdp_fact(noNA, "category", "Conservation Status", pcolor = FALSE)
 fr <- make_pdp_cont(noNA, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
+mx <- make_pdp_cont(noNA, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = FALSE)
+fa <- make_pdp_cont(noNA, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = FALSE)
+cs <- make_pdp_fact(noNA, "category", "Conservation Status", pcolor = FALSE)
+vt <- make_pdp_cont(noNA, "dphy_invertebrate","Diet Invertebrate", pcolor = FALSE)
 hp <- make_pdp_cont(noNA, "X27.2_HuPopDen_Mean_n.km2", "Mean Human Density", pcolor = FALSE)
-ml <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = FALSE)
 
 # Save
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 3.png", width=7,height=7.5,units="in",res=300)
-gr + hb + pm + at + ls + mp + am + dp + bl + fa + mx + cs + fr + hp + ml + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+hb + gr + pm + at + ls + mp + bl + am + dp + fr + mx + fa + cs + vt + hp + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 9 no NAs.png", width=10,height=8,units="in",res=300)
-hb + gr + at + pm + ls + fr + fa + am + bl + plot_layout(nrow = 3, ncol = 3, byrow = TRUE)
+hb + gr + pm + at + ls + mp + bl + am + dp + plot_layout(nrow = 3, ncol = 3, byrow = TRUE)
 dev.off()
 
 #  Pseudo model pdps 
 phb <- make_pdp_cont(pseudo,"habitat_breadth_n", "Habitat Breadth", pcolor = TRUE)
 pgr <- make_pdp_cont(pseudo, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = TRUE)
-ppm <- make_pdp_cont(pseudo, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
 pat <- make_pdp_cont(pseudo, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = TRUE)
+ppm <- make_pdp_cont(pseudo, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
 pls <- make_pdp_cont(pseudo, "litter_size_n", "Litter Size", pcolor = TRUE)
-pmx <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Maximum Latitude", pcolor = TRUE)
-pcs <- make_pdp_fact(pseudo, "category", "Conservation Status", pcolor = TRUE)
+pmx <- make_pdp_cont(pseudo, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = TRUE)
 pcc <- make_pdp_cont(pseudo, "cites","Citation Count", pcolor = TRUE)
+pcs <- make_pdp_fact(pseudo, "category","Conservation Status", pcolor = TRUE)
 pam <- make_pdp_cont(pseudo, "adult_mass_g","Adult Mass (g)", pcolor = TRUE)
 ppt <- make_pdp_cont(pseudo, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = TRUE)
 pdp <- make_pdp_cont(pseudo, "dphy_plant","Diet Plants (%)", pcolor = TRUE)
-pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
 pml <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
 pfa <- make_pdp_cont(pseudo, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = TRUE)
+pbl <- make_pdp_cont(pseudo, "adult_body_length_mm", "Adult Body Length", pcolor = TRUE)
+pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
+
 
 # Save
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=300)
-phb + pgr + pat + ppm + pat + pls + pmx + pcs + pcc + pam + ppt + pdp + pfr + pml + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+phb + pgr + pat + ppm + pls + pmx + pcc + pcs + pam + ppt + pdp + pml + pfa + pbl + pfr + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
-

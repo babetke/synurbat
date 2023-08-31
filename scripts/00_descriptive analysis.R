@@ -55,18 +55,18 @@ fam_cov <- fam_cov %>%
 label_fam <- fam_cov %>% 
   mutate(with(fam_cov, paste(family, "(", sample, ")"))) %>% 
   rename() %>%
-  arrange(desc(frac)) 
+  arrange(frac) 
 
 # plot family coverage
-fam_gg <- ggplot(datat, aes(reorder(family, is.na(Synurbic)))) + 
+fam_gg <- ggplot(datat, aes(reorder(family, -is.na(Synurbic)))) + 
   geom_bar(aes(fill = Synurbic), position = position_fill(reverse = TRUE)) +
   scale_y_continuous(labels = scales::percent) +
   coord_flip() +
   theme_bw() +
-  labs(x = NULL, y = "coverage", fill = "Anthropogenic Roosting") +
+  labs(x = NULL, y = "Percent of Species", fill = "Anthropogenic Roosting") +
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  scale_fill_manual(labels = c("no","yes","NA"), values = c("#8470ff","#9DD866","#A0B1BA")) +
+  scale_fill_manual(labels = c("no","yes","unkown"), values = c("#8470ff","#9DD866","#A0B1BA")) +
   scale_x_discrete(labels = label_fam$`with(fam_cov, paste(family, "(", sample, ")"))`)
 
 # format text
@@ -126,19 +126,19 @@ br_cov <- br_cov %>%
 label_gr <- br_cov %>% 
   mutate(with(br_cov, paste(fbr, "(", sample, ")"))) %>% 
   rename() %>%
-  arrange(desc(frac)) 
+  arrange(frac) 
 
 # plot coverage
-br_gg <- ggplot(gr_dat, aes(reorder(fbr, is.na(Synurbic)))) + 
+br_gg <- ggplot(gr_dat, aes(reorder(fbr, -is.na(Synurbic)))) + 
   geom_bar(aes(fill = Synurbic), position = position_fill(reverse = TRUE)) +
   scale_y_continuous(labels = scales::percent) +
   coord_flip() +
   theme_bw() +
-  labs(x = NULL, y = "coverage", fill = "Anthropogenic Roosting") +
+  labs(x = NULL, y = "Percent of Species", fill = "Anthropogenic Roosting") +
   theme(legend.position = "none",
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  scale_fill_manual(labels = c("no","yes","NA"), values = c("#8470ff","#9DD866","#A0B1BA")) +
+  scale_fill_manual(labels = c("no","yes","unknown"), values = c("#8470ff","#9DD866","#A0B1BA")) +
   scale_x_discrete(labels = label_gr$`with(br_cov, paste(fbr, "(", sample, ")"))`)
 
 br_gg <- br_gg + theme(axis.text.y=element_text(size=6),
@@ -196,19 +196,19 @@ cat_cov <- cat_cov %>%
 label_cat <- cat_cov %>% 
   mutate(with(cat_cov, paste(fcat, "(", sample, ")"))) %>% 
   rename() %>%
-  arrange(desc(frac))
+  arrange(frac)
 
 # plot coverage
-iucn_gg <- ggplot(datat, aes(reorder(fcat, is.na(Synurbic)))) + 
+iucn_gg <- ggplot(datat, aes(reorder(fcat, -is.na(Synurbic)))) + 
   geom_bar(aes(fill = Synurbic), position = position_fill(reverse = TRUE)) +
   scale_y_continuous(labels = scales::percent) +
   coord_flip() +
   theme_bw() +
-  labs(x = NULL, y = "coverage", fill = "Anthropogenic Roosting") +
+  labs(x = NULL, y = "Percent of Species", fill = "Anthropogenic Roosting") +
   theme(legend.position = "none",
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()) +
-  scale_fill_manual(labels = c("no","yes","NA"), values = c("#8470ff","#9DD866","#A0B1BA")) +
+  scale_fill_manual(labels = c("no","yes","unknown"), values = c("#8470ff","#9DD866","#A0B1BA")) +
   scale_x_discrete(labels = label_cat$`with(cat_cov, paste(fcat, "(", sample, ")"))`)
 
 iucn_gg <- iucn_gg + theme(axis.text.y=element_text(size=6),
