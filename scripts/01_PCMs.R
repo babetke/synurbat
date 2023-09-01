@@ -1,10 +1,11 @@
 ## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 07/03/2023
+## last updated 08/30/2023
 
 ## clean environment & plots
 rm(list=ls()) 
 graphics.off()
+gc()
 
 ## packages
 library(tidyverse)
@@ -68,6 +69,7 @@ cdata$data$Synurbic_pseudo=ifelse(is.na(cdata$data$Synurbic),0,cdata$data$Synurb
 tab=table(cdata$data$Synurbic)
 round(tab["1"]/nrow(cdata$data),2)
 round(tab["0"]/nrow(cdata$data),2)
+tab
 
 ## taxonomy
 cdata$data$taxonomy=paste(cdata$data$fam,cdata$data$gen,cdata$data$Species,sep='; ')
@@ -283,7 +285,7 @@ prior=make.prior.exponential(1/(2*(p[1]-p[3])))
 
 ## assign w
 set.seed(1)
-tmp=mcmc(tmodel,top$par,nsteps=100,prior=prior,lower=0,w=rep(1,length(top$par)),print.every=0) 
+tmp=mcmc(tmodel,top$par,nsteps=10,prior=prior,lower=0,w=rep(1,length(top$par)),print.every=0) 
 w=diff(sapply(tmp[names(top$par)],range))
 
 ## run the chain to get 95% CIs
@@ -364,13 +366,11 @@ tmp$ptype=factor(tmp$ptype,levels=c("speciation","extinction","transition"))
 bisse_plot=ggplot(tmp,aes(par2,est,colour=type,fill=type))+
   coord_flip()+
   facet_wrap(~ptype,ncol=1,scales="free_y",strip.position="right",shrink=T)+
-  stat_halfeye(slab_alpha=0.25,point_size=2)+
+  stat_halfeye(slab_alpha=0.25,point_size=2,point_interval="mean_qi")+
   th+
   labs(y="Posterior Samples",x="BiSSE Parameters")+
   scale_x_discrete(labels=scales::label_parse())+
-  theme(axis.text.y=element_text(size=12),
-        strip.text=element_blank(),
-        strip.background=element_blank())+
+  theme(axis.text.y=element_text(size=12))+
   guides(colour="none",fill="none")+
   scale_colour_manual(values=rev(scols))+
   scale_fill_manual(values=rev(scols))
@@ -380,7 +380,7 @@ rootn=c(1,0)
 names(rootn)=levels(factor(set$data$Synurbic))
 
 ## clean large files
-rm(mod1,tmp,fit1,cfit1,cfit2,cfit3,cfit4,cfit5,cfit6,cfit7,cfit8)
+rm(mod1,fit1,cfit1,cfit2,cfit3,cfit4,cfit5,cfit6,cfit7,cfit8)
 
 ## test
 set.seed(1)
@@ -425,9 +425,6 @@ lset=lapply(1:length(lobj),function(x){
   
 ## save as dataset
 lset=do.call(rbind.data.frame,lset)
-
-## clean
-rm(lobj)
 
 ## wide to long
 lset=tidyr::gather(lset,lin,number,natural:anthropogenic)
@@ -521,18 +518,30 @@ asr_tree=asr_tree+
                   offset=2.5, offset.text = 2.5,
                   angle=90, fontsize = 3)+
   geom_cladelabel(node=bpf_results$node[2],
-                  label="Noctilionoidea",hjust=0.5,
+                  label="Stenodermatinae",hjust=0.5,
                   offset=2.5, offset.text = 2.5,
                   angle=90, fontsize = 3)
 
 ## combine bisse and ltt
-bt=egg::ggarrange(bisse_plot,ltt_plot,ncol=1,heights=c(1.5,1.1))
+library(ggpubr)
+#bt=egg::ggarrange(bisse_plot,ltt_plot,ncol=1,heights=c(1.5,1.1))
+bt=ggpubr::ggarrange(bisse_plot,ltt_plot,
+                     ncol=1,heights=c(1.5,1.1),
+                     labels=c("B","C"),
+                     font.label=list(size=11,face="plain"),
+                     hjust=-0.7,
+                     vjust=c(2,0.1))
 
 ## combine all plots
 library(patchwork)
 setwd("/Users/danielbecker/Desktop/synurbat/figures")
 png("Figure 4.png",width=7,height=5,units="in",res=300)
-(asr_tree|bt)+plot_layout(widths=c(1.5,1))
+#(asr_tree|bt)+plot_layout(widths=c(1.5,1))
+ggpubr::ggarrange(asr_tree,bt,
+                  ncol=2,widths=c(1.5,1),
+                  labels=c("A"),
+                  font.label=list(size=11,face="plain"),
+                  vjust=2)
 dev.off()
 
 ## repeat BiSSE for pseudoabsence dataset
@@ -669,7 +678,7 @@ png("Figure S3.png",width=4,height=4,units="in",res=300)
 ggplot(tmp,aes(par2,est,colour=type,fill=type))+
   coord_flip()+
   facet_wrap(~ptype,ncol=1,scales="free_y",strip.position="right",shrink=T)+
-  stat_halfeye(slab_alpha=0.25,point_size=2)+
+  stat_halfeye(slab_alpha=0.25,point_size=2,point_interval="mean_qi")+
   th+
   labs(y="Posterior Samples",x="BiSSE Parameters")+
   scale_x_discrete(labels=scales::label_parse())+
