@@ -454,7 +454,7 @@ mset$lin=factor(mset$lin,levels=c("natural","anthropogenic"))
 
 ## visualize
 ltt_plot=ggplot()+
-  geom_line(data=lset,aes(times,number,colour=lin,group=sim),alpha=0.2,linewidth=0.1)+
+  geom_line(data=lset,aes(times,number,colour=lin,group=sim),alpha=0.1,linewidth=0.05)+
   geom_line(data=mset,aes(times,number,colour=lin),linewidth=1.25)+
   scale_y_continuous(trans = scales::pseudo_log_trans(2, 1000), breaks=c(1,10,100,1000), limits=c(0,1000), 
                      labels = scales::trans_format("log10", scales::math_format(10^.x)))+
