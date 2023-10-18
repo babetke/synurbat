@@ -432,3 +432,34 @@ pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=300)
 phb + pgr + pat + ppm + pls + pmx + pcc + pcs + pam + ppt + pdp + pml + pfa + pbl + pfr + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
+
+
+## post-hoc testing of associations between body mass and fruit 
+# traits 
+data <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.rds")
+
+ggplot(data, aes(x=det_fruit, y=adult_mass_g)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  theme_bw()
+
+ggplot(data, aes(x=det_fruit, y=adult_body_length_mm)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  theme_bw()
+
+cor.test(data$det_fruit, data$adult_mass_g, method = "pearson")
+cor.test(data$det_fruit, data$adult_body_length_mm, method = "pearson")
+
+ggplot(data, aes(x=det_inv, y=adult_mass_g)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  theme_bw()
+
+ggplot(data, aes(x=det_inv, y=adult_body_length_mm)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  theme_bw()
+
+cor.test(data$det_inv, data$adult_mass_g, method = "pearson")
+cor.test(data$det_inv, data$adult_body_length_mm, method = "pearson")
