@@ -37,10 +37,12 @@ th=theme_bw()+
 
 ## load in roosting data
 setwd("~/Desktop/synurbat/flat files")
+setwd("/Users/danielbecker/Desktop/GitHub/synurbat/flat files")
 data=readRDS("synurbic and traits only.rds")
 
 ## load in Upham phylogeny
 setwd("~/Desktop/synurbat/phylos")
+setwd("/Users/danielbecker/Desktop/GitHub/synurbat/phylos")
 tree=read.nexus('MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre')
 
 ## fix tip
@@ -80,6 +82,14 @@ cdata$data$label=cdata$data$tip
 
 ## factor
 cdata$data$sgroup=factor(cdata$data$Synurbic)
+
+## pgls models for geographic range and size
+mod=pgls(log10(X26.1_GR_Area_km2)~log10(adult_mass_g),data=cdata,lambda="ML"); summary(mod)
+mod=pgls(log10(X26.1_GR_Area_km2)~adult_forearm_length_mm,data=cdata,lambda="ML"); summary(mod)
+
+## pgls models for forearm
+mod=pgls(adult_forearm_length_mm~det_fruit,data=cdata,lambda="ML"); summary(mod)
+mod=pgls(adult_forearm_length_mm~det_inv,data=cdata,lambda="ML"); summary(mod)
 
 ## trim to tree with data
 set=cdata[!is.na(cdata$data$Synurbic),]
