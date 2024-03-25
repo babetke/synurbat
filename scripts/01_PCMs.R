@@ -1,6 +1,6 @@
 ## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 08/30/2023
+## last updated 03/24/2024
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -69,7 +69,7 @@ cdata$data$Synurbic_pseudo=ifelse(is.na(cdata$data$Synurbic),0,cdata$data$Synurb
 
 ## tally
 tab=table(cdata$data$Synurbic)
-round(tab["1"]/nrow(cdata$data),2)
+round(tab["1"]/nrow(cdata$data),3)
 round(tab["0"]/nrow(cdata$data),2)
 tab
 
@@ -545,6 +545,7 @@ bt=ggpubr::ggarrange(bisse_plot,ltt_plot,
 ## combine all plots
 library(patchwork)
 setwd("/Users/danielbecker/Desktop/synurbat/figures")
+setwd("/Users/danielbecker/Desktop/GitHub/synurbat/figures")
 png("Figure 4.png",width=7,height=5,units="in",res=300)
 #(asr_tree|bt)+plot_layout(widths=c(1.5,1))
 ggpubr::ggarrange(asr_tree,bt,
@@ -683,7 +684,7 @@ tmp$ptype=revalue(tmp$par,
 tmp$ptype=factor(tmp$ptype,levels=c("speciation","extinction","transition"))
 
 ## ggdist
-setwd("/Users/danielbecker/Desktop/synurbat/figures")
+#setwd("/Users/danielbecker/Desktop/synurbat/figures")
 png("Figure S3.png",width=4,height=4,units="in",res=300)
 ggplot(tmp,aes(par2,est,colour=type,fill=type))+
   coord_flip()+
