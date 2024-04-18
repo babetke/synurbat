@@ -11,47 +11,52 @@ library(patchwork)
 library(gbm)
 library(ggrepel)
 
-# read in rds of model results 
-noNA <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")
-pseudo <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/pseudo_brts.rds")
-
+# read in rds of model results - updated log
+# noNA <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")
+# pseudo <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/pseudo_brts.rds")
+log_brts <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/log_brts.rds")
+log_pseudo_brts <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/log_pseudo_brts.rds")
+  
 #### Variable importance plots
+# updated to label log variables
 inf_plot <- function(rds_name1, rds_name2 = NULL){
 
   if(is.null(rds_name2)){
     # extract variable importance
-    rds_vars <- noNA[["rinf"]]
+    rds_vars <- rds_name1[["rinf"]]
     
     # Create type variable
     rds_vars <- mutate(rds_vars, type = ifelse(startsWith(var, "X"), "Geographic", 
                                                ifelse(startsWith(var, "det"), "Forage", 
                                                       ifelse(var %in% c("Palearctic", "Neotropical", "Afrotropical","Indomalayan","Nearctic",
-                                                                        "Oceanian","Australasian","glaciation", "habitat_breadth_n","altitude_breadth_m","disected_by_mountains"),"Geographic",
-                                                             ifelse(var %in% c("dphy_invertebrate","dphy_plant","dphy_vertebrate","trophic_level","foraging_stratum","lower_elevation_m","upper_elevation_m"),"Forage",
+                                                                        "Oceanian","Australasian","glaciation", "habitat_breadth_n","altitude_breadth_m","disected_by_mountains",
+                                                                        "log_X26.1_GR_Area_km2", "log_X27.2_HuPopDen_Mean_n.km2","log_lower_elevation_m","upper_elevation_m",
+                                                                        "log_X27.1_HuPopDen_Min_n.km2","log_X27.3_HuPopDen_5p_n.km2", "island_dwelling"),"Geographic",
+                                                             ifelse(var %in% c("dphy_invertebrate","dphy_plant","dphy_vertebrate","trophic_level","foraging_stratum"),"Forage",
                                                                     ifelse(startsWith(var, "fam"),"Phylogeny",
-                                                                           ifelse(var %in% c("category","population_trend","cites"),"Other", "Life History")))))))
+                                                                           ifelse(var %in% c("category","population_trend","log_cites"),"Other", "Life History")))))))
     
     # Clean up variable names
     rds_vars$var <- recode(rds_vars$var,
-                           "cites" = "Citation Count",
-                           "X26.1_GR_Area_km2" = "Geographic Area",
+                           "log_cites" = "Log Citation Count",
+                           "log_X26.1_GR_Area_km2" = "Log Geographic Area",
                            "X30.1_AET_Mean_mm" = "Mean Monthly AET",
                            "X26.2_GR_MaxLat_dd" = "Maximum Latitude",
                            "X26.3_GR_MinLat_dd" = "Minimum Latitude",
                            "habitat_breadth_n" = "Habitat Breadth",
                            "litters_per_year_n" = "Litters Per Year",
-                           "adult_body_length_mm" = "Adult Body Length",
+                           "log_adult_body_length_mm" = "Log Adult Body Length",
                            "X28.2_Temp_Mean_01degC" = "Mean Monthly Temperature",
-                           "X27.2_HuPopDen_Mean_n.km2" = "Mean Human Density",
+                           "log_X27.2_HuPopDen_Mean_n.km2" = "Log Mean Human Density",
                            "X28.1_Precip_Mean_mm" = "Mean Monthly Precipitation",
                            "litter_size_n" = "Litter Size",
                            "upper_elevation_m" = "Upper Elevation Limit",
                            "disected_by_mountains" = "Disected by Mountains",
-                           "adult_forearm_length_mm" = "Adult Forearm Length",
+                           "log_adult_forearm_length_mm" = "Log Adult Forearm Length",
                            "altitude_breadth_m" = "Altitude Breadth",
                            "X26.4_GR_MidRangeLat_dd" = "Median Latitudinal Range",
                            "foraging_stratum" = "Foraging stratum",
-                           "adult_mass_g" = "Adult Mass",
+                           "log_adult_mass_g" = "Log Adult Mass",
                            "X30.2_PET_Mean_mm" = "Mean Monthly PET",
                            "det_vfish" = "Diet Fish",
                            "X26.5_GR_MaxLong_dd" = "Maximum Longitude",
@@ -59,12 +64,12 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                            "det_diet_breadth_n" = "Diet Breadth",
                            "X26.6_GR_MinLong_dd" = "Minimum Longitude",
                            "det_vend" = "Diet Vend",
-                           "X27.1_HuPopDen_Min_n.km2" = "Min Human Density",
+                           "log_X27.1_HuPopDen_Min_n.km2" = "Log Min Human Density",
                            "dphy_vertebrate" = "Diet Vertebrate",
-                           "lower_elevation_m" = "Lower Elevation Limit",
+                           "log_lower_elevation_m" = "Log Lower Elevation Limit",
                            "det_nect" = "Diet Nectar",
                            "X27.4_HuPopDen_Change" = "Human Density Change",
-                           "X27.3_HuPopDen_5p_n.km2" = "Human Density 5th Percentile",
+                           "log_X27.3_HuPopDen_5p_n.km2" = "Log Human Density 5th %ile",
                            "X26.7_GR_MidRangeLong_dd" = "Median Longitudinal Range",
                            "det_fruit" = "Diet Fruit",
                            "fam_PHYLLOSTOMIDAE" = "Phyllostomidae",
@@ -116,25 +121,25 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
   
   # Clean up variable names
   rds_vars$var <- recode(rds_vars$var,
-                         "cites" = "Citation Count",
-                         "X26.1_GR_Area_km2" = "Geographic Area",
+                         "log_cites" = "Log Citation Count",
+                         "log_X26.1_GR_Area_km2" = "Log Geographic Area",
                          "X30.1_AET_Mean_mm" = "Mean Monthly AET",
                          "X26.2_GR_MaxLat_dd" = "Maximum Latitude",
                          "X26.3_GR_MinLat_dd" = "Minimum Latitude",
                          "habitat_breadth_n" = "Habitat Breadth",
                          "litters_per_year_n" = "Litters Per Year",
-                         "adult_body_length_mm" = "Adult Body Length",
+                         "log_adult_body_length_mm" = "Log Adult Body Length",
                          "X28.2_Temp_Mean_01degC" = "Mean Monthly Temperature",
-                         "X27.2_HuPopDen_Mean_n.km2" = "Mean Human Density",
+                         "log_X27.2_HuPopDen_Mean_n.km2" = "Log Mean Human Density",
                          "X28.1_Precip_Mean_mm" = "Mean Monthly Precipitation",
                          "litter_size_n" = "Litter Size",
                          "upper_elevation_m" = "Upper Elevation Limit",
                          "disected_by_mountains" = "Disected by Mountains",
-                         "adult_forearm_length_mm" = "Adult Forearm Length",
+                         "log_adult_forearm_length_mm" = "Log Adult Forearm Length",
                          "altitude_breadth_m" = "Altitude Breadth",
                          "X26.4_GR_MidRangeLat_dd" = "Median Latitudinal Range",
                          "foraging_stratum" = "Foraging stratum",
-                         "adult_mass_g" = "Adult Mass",
+                         "log_adult_mass_g" = "Log Adult Mass",
                          "X30.2_PET_Mean_mm" = "Mean Monthly PET",
                          "det_vfish" = "Diet Fish",
                          "X26.5_GR_MaxLong_dd" = "Maximum Longitude",
@@ -142,12 +147,12 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
                          "det_diet_breadth_n" = "Diet Breadth",
                          "X26.6_GR_MinLong_dd" = "Minimum Longitude",
                          "det_vend" = "Diet Vend",
-                         "X27.1_HuPopDen_Min_n.km2" = "Min Human Density",
+                         "log_X27.1_HuPopDen_Min_n.km2" = "Log Min Human Density",
                          "dphy_vertebrate" = "Diet Vertebrate",
-                         "lower_elevation_m" = "Lower Elevation Limit",
+                         "log_lower_elevation_m" = "Log Lower Elevation Limit",
                          "det_nect" = "Diet Nectar",
                          "X27.4_HuPopDen_Change" = "Human Density Change",
-                         "X27.3_HuPopDen_5p_n.km2" = "Human Density 5th Percentile",
+                         "log_X27.3_HuPopDen_5p_n.km2" = "Log Human Density 5th %ile",
                          "X26.7_GR_MidRangeLong_dd" = "Median Longitudinal Range",
                          "det_fruit" = "Diet Fruit",
                          "fam_PHYLLOSTOMIDAE" = "Phyllostomidae",
@@ -222,31 +227,7 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
     scale_x_continuous(labels = scales::percent, limits = c(0, 0.1252)) +
     scale_y_continuous(labels = scales::percent)
   
-  # ranks_gg <- ranks_gg + theme(axis.text = element_text(size=5),
-  #                              axis.title=element_text(size=6))
-  
-  #multi <- (var.inf + ranks_gg + plot_layout(widths = c(0.75, 2.25)) & theme(plot.tag = element_text(size = 7))) + plot_annotation(tag_levels = "A")
-  
-  
-  # multi plot
-  #multi <- (var.inf + ranks_gg + plot_layout(widths = c(1, 2)) & theme(plot.tag = element_text(size = 8)))
-  # left <- var.inf & theme(plot.tag = element_text(size = 8))
-  # right <- ranks_gg & theme(plot.tag = element_text(size = 8))
-  # multi <- wrap_plots(left + right) + plot_annotation(tag_levels = 'A')
-  
-  #multi <- multi + plot_annotation(tag_levels = 'A')
-  
-  # bars
-  # ggplot(rds_vars) + 
-  #   #geom_crossbar(aes(ymin = avg-rse, ymax = avg+rse), alpha = 0.5) +
-  #   geom_bar(aes(x = reorder(var, rel.inf.x), y = rel.inf.y), stat = "identity", fill = "orange",alpha = 0.5) +
-  #   geom_bar(aes(x = reorder(var, rel.inf.x), y = rel.inf.x), stat = "identity", alpha = 0.75) +
-  #   theme(axis.text.x = element_text(size = 10, hjust = 1),
-  #         legend.position = "none") +
-  #   theme_bw() +
-  #   labs(x = " ", y = "Relative Importance") +
-  #   coord_flip()
-  
+  # return list
   return(list(rho = rho,
               var.inf = var.inf,
               scatter = ranks_gg))
@@ -256,25 +237,24 @@ inf_plot <- function(rds_name1, rds_name2 = NULL){
 
 # No NA only 
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 2.png", width=4.5, height=5.75, units="in", res=300)
-inf_plot(noNA)
+inf_plot(log_brts)
 dev.off()
 
 # both models, scatter plot, and pearons rho
-rel_gg <- inf_plot(noNA, pseudo)
+rel_gg <- inf_plot(log_brts, log_pseudo_brts)
 
 # view cor output
 rel_gg[["rho"]]
-
 # Pearson's product-moment correlation
 # 
 # data:  rds_vars$rel.inf.x and rds_vars$rel.inf.y
-# t = 24.337, df = 59, p-value < 2.2e-16
+# t = 25.137, df = 59, p-value < 2.2e-16
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.9236110 0.9720261
+#  0.9280182 0.9736782
 # sample estimates:
 #       cor 
-# 0.9536318 
+# 0.9563463 
 
 # or inset plot
 library(cowplot)
@@ -384,82 +364,125 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
 }
 
 ## Plot partial dependence
+# # No NA pdps
+# gr <- make_pdp_cont(noNA, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = FALSE)
+# hb <- make_pdp_cont(noNA,"habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
+# pm <- make_pdp_cont(noNA, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = FALSE)
+# at <- make_pdp_cont(noNA, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
+# ls <- make_pdp_cont(noNA, "litter_size_n", "Litter Size", pcolor = FALSE)
+# mp <- make_pdp_cont(noNA, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = FALSE)
+# dp <- make_pdp_cont(noNA, "dphy_plant","Diet Plants (%)", pcolor = FALSE)
+# bl <- make_pdp_cont(noNA, "adult_body_length_mm", "Adult Body Length", pcolor = FALSE)
+# am <- make_pdp_cont(noNA, "adult_mass_g","Adult Mass (g)", pcolor = FALSE)
+# fr <- make_pdp_cont(noNA, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
+# mx <- make_pdp_cont(noNA, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = FALSE)
+# cs <- make_pdp_fact(noNA, "category", "Conservation Status", pcolor = FALSE)
+# fa <- make_pdp_cont(noNA, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = FALSE)
+# ml <- make_pdp_cont(noNA, "X26.3_GR_MinLat_dd","Minimum Latitude", pcolor = FALSE)
+# hp <- make_pdp_cont(noNA, "X27.2_HuPopDen_Mean_n.km2", "Mean Human Density", pcolor = FALSE)
+# 
+# # Save
+# png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 3.png", width=7,height=7.5,units="in",res=300)
+# gr + hb + pm + at + ls + mp + dp + bl + am + fr + mx + cs + fa + ml + hp + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+# dev.off()
+
+# log pdps
 # No NA pdps
-hb <- make_pdp_cont(noNA,"habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
-gr <- make_pdp_cont(noNA, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = FALSE)
-pm <- make_pdp_cont(noNA, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = FALSE)
-at <- make_pdp_cont(noNA, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
-ls <- make_pdp_cont(noNA, "litter_size_n", "Litter Size", pcolor = FALSE)
-mp <- make_pdp_cont(noNA, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = FALSE)
-bl <- make_pdp_cont(noNA, "adult_body_length_mm", "Adult Body Length", pcolor = FALSE)
-am <- make_pdp_cont(noNA, "adult_mass_g","Adult Mass (g)", pcolor = FALSE)
-dp <- make_pdp_cont(noNA, "dphy_plant","Diet Plants (%)", pcolor = FALSE)
-fr <- make_pdp_cont(noNA, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
-mx <- make_pdp_cont(noNA, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = FALSE)
-fa <- make_pdp_cont(noNA, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = FALSE)
-cs <- make_pdp_fact(noNA, "category", "Conservation Status", pcolor = FALSE)
-vt <- make_pdp_cont(noNA, "dphy_invertebrate","Diet Invertebrate", pcolor = FALSE)
-hp <- make_pdp_cont(noNA, "X27.2_HuPopDen_Mean_n.km2", "Mean Human Density", pcolor = FALSE)
+gr <- make_pdp_cont(log_brts, "log_X26.1_GR_Area_km2", "Log Geographic Area (km2)", pcolor = FALSE)
+hb <- make_pdp_cont(log_brts, "habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
+pm <- make_pdp_cont(log_brts, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = FALSE)
+at <- make_pdp_cont(log_brts, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
+ls <- make_pdp_cont(log_brts, "litter_size_n", "Litter Size", pcolor = FALSE)
+mp <- make_pdp_cont(log_brts, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = FALSE)
+dp <- make_pdp_cont(log_brts, "dphy_plant","Diet Plants (%)", pcolor = FALSE)
+bl <- make_pdp_cont(log_brts, "log_adult_body_length_mm", "Log Adult Body Length", pcolor = FALSE)
+am <- make_pdp_cont(log_brts, "log_adult_mass_g","Log Adult Mass (g)", pcolor = FALSE)
+fr <- make_pdp_cont(log_brts, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
+mx <- make_pdp_cont(log_brts, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = FALSE)
+cs <- make_pdp_fact(log_brts, "category", "Conservation Status", pcolor = FALSE)
+fa <- make_pdp_cont(log_brts, "log_adult_forearm_length_mm", "Log Adult Forearm Length", pcolor = FALSE)
+ml <- make_pdp_cont(log_brts, "X26.3_GR_MinLat_dd","Minimum Latitude", pcolor = FALSE)
+hp <- make_pdp_cont(log_brts, "log_X27.2_HuPopDen_Mean_n.km2", "Log Mean Human Density", pcolor = FALSE)
 
-# Save
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 3.png", width=7,height=7.5,units="in",res=300)
-hb + gr + pm + at + ls + mp + bl + am + dp + fr + mx + fa + cs + vt + hp + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+gr + hb + pm + at + ls + mp + dp + bl + am + fr + mx + cs + fa + ml + hp + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 9 no NAs.png", width=10,height=8,units="in",res=300)
-hb + gr + pm + at + ls + mp + bl + am + dp + plot_layout(nrow = 3, ncol = 3, byrow = TRUE)
-dev.off()
+# png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 9 no NAs.png", width=10,height=8,units="in",res=300)
+# hb + gr + pm + at + ls + mp + bl + am + dp + plot_layout(nrow = 3, ncol = 3, byrow = TRUE)
+# dev.off()
 
-#  Pseudo model pdps 
-phb <- make_pdp_cont(pseudo,"habitat_breadth_n", "Habitat Breadth", pcolor = TRUE)
-pgr <- make_pdp_cont(pseudo, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = TRUE)
-pat <- make_pdp_cont(pseudo, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = TRUE)
-ppm <- make_pdp_cont(pseudo, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
-pls <- make_pdp_cont(pseudo, "litter_size_n", "Litter Size", pcolor = TRUE)
-pmx <- make_pdp_cont(pseudo, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = TRUE)
-pcc <- make_pdp_cont(pseudo, "cites","Citation Count", pcolor = TRUE)
-pcs <- make_pdp_fact(pseudo, "category","Conservation Status", pcolor = TRUE)
-pam <- make_pdp_cont(pseudo, "adult_mass_g","Adult Mass (g)", pcolor = TRUE)
-ppt <- make_pdp_cont(pseudo, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = TRUE)
-pdp <- make_pdp_cont(pseudo, "dphy_plant","Diet Plants (%)", pcolor = TRUE)
-pml <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
-pfa <- make_pdp_cont(pseudo, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = TRUE)
-pbl <- make_pdp_cont(pseudo, "adult_body_length_mm", "Adult Body Length", pcolor = TRUE)
-pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
+# #  Pseudo model pdps 
+# phb <- make_pdp_cont(pseudo,"habitat_breadth_n", "Habitat Breadth", pcolor = TRUE)
+# pgr <- make_pdp_cont(pseudo, "X26.1_GR_Area_km2", "Geographic Area (km2)", pcolor = TRUE)
+# ppm <- make_pdp_cont(pseudo, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
+# pat <- make_pdp_cont(pseudo, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = TRUE)
+# pls <- make_pdp_cont(pseudo, "litter_size_n", "Litter Size", pcolor = TRUE)
+# pdp <- make_pdp_cont(pseudo, "dphy_plant","Diet Plants (%)", pcolor = TRUE)
+# pcc <- make_pdp_cont(pseudo, "cites","Citation Count", pcolor = TRUE)
+# pmx <- make_pdp_cont(pseudo, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = TRUE)
+# pcs <- make_pdp_fact(pseudo, "category","Conservation Status", pcolor = TRUE)
+# pml <- make_pdp_cont(pseudo, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
+# ppt <- make_pdp_cont(pseudo, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = TRUE)
+# pfr <- make_pdp_cont(pseudo, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
+# pam <- make_pdp_cont(pseudo, "adult_mass_g","Adult Mass (g)", pcolor = TRUE)
+# pbl <- make_pdp_cont(pseudo, "adult_body_length_mm", "Adult Body Length", pcolor = TRUE)
+# pfa <- make_pdp_cont(pseudo, "adult_forearm_length_mm", "Adult Forearm Length", pcolor = TRUE)
+# 
+# # Save
+# png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=300)
+# phb + pgr + ppm + pat + pls + pdp + pcc + pmx + pcs + pml + ppt + pfr + pam + pbl + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+# dev.off()
 
+# log pseudoabs model
+phb <- make_pdp_cont(log_pseudo_brts,"habitat_breadth_n", "Habitat Breadth", pcolor = TRUE)
+pgr <- make_pdp_cont(log_pseudo_brts, "log_X26.1_GR_Area_km2", "Log Geographic Area (km2)", pcolor = TRUE)
+ppm <- make_pdp_cont(log_pseudo_brts, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
+pat <- make_pdp_cont(log_pseudo_brts, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = TRUE)
+pls <- make_pdp_cont(log_pseudo_brts, "litter_size_n", "Litter Size", pcolor = TRUE)
+pdp <- make_pdp_cont(log_pseudo_brts, "dphy_plant","Diet Plants (%)", pcolor = TRUE)
+pcc <- make_pdp_cont(log_pseudo_brts, "log_cites","Log Citation Count", pcolor = TRUE)
+pmx <- make_pdp_cont(log_pseudo_brts, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = TRUE)
+pcs <- make_pdp_fact(log_pseudo_brts, "category","Conservation Status", pcolor = TRUE)
+pml <- make_pdp_cont(log_pseudo_brts, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
+ppt <- make_pdp_cont(log_pseudo_brts, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = TRUE)
+pfr <- make_pdp_cont(log_pseudo_brts, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
+pam <- make_pdp_cont(log_pseudo_brts, "log_adult_mass_g","Log Adult Mass (g)", pcolor = TRUE)
+pbl <- make_pdp_cont(log_pseudo_brts, "log_adult_body_length_mm", "Log Adult Body Length", pcolor = TRUE)
+pfa <- make_pdp_cont(log_pseudo_brts, "log_adult_forearm_length_mm", "Log Adult Forearm Length", pcolor = TRUE)
 
 # Save
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=300)
-phb + pgr + pat + ppm + pls + pmx + pcc + pcs + pam + ppt + pdp + pml + pfa + pbl + pfr + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+phb + pgr + ppm + pat + pls + pdp + pcc + pmx + pcs + ppt + pml + pam + pfr + pbl + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
-
-## post-hoc testing of associations between body mass and fruit 
-# traits 
-data <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.rds")
-
-ggplot(data, aes(x=det_fruit, y=adult_mass_g)) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  theme_bw()
-
-ggplot(data, aes(x=det_fruit, y=adult_body_length_mm)) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  theme_bw()
-
-cor.test(data$det_fruit, data$adult_mass_g, method = "pearson")
-cor.test(data$det_fruit, data$adult_body_length_mm, method = "pearson")
-
-ggplot(data, aes(x=det_inv, y=adult_mass_g)) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  theme_bw()
-
-ggplot(data, aes(x=det_inv, y=adult_body_length_mm)) +
-  geom_point() +
-  geom_smooth(method="lm") +
-  theme_bw()
-
-cor.test(data$det_inv, data$adult_mass_g, method = "pearson")
-cor.test(data$det_inv, data$adult_body_length_mm, method = "pearson")
+######## PGLS instead in PCM script
+# ## post-hoc testing of associations between body mass and fruit 
+# # traits 
+# data <- readRDS("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/synurbic and traits only.rds")
+# 
+# ggplot(data, aes(x=det_fruit, y=adult_mass_g)) +
+#   geom_point() +
+#   geom_smooth(method="lm") +
+#   theme_bw()
+# 
+# ggplot(data, aes(x=det_fruit, y=adult_body_length_mm)) +
+#   geom_point() +
+#   geom_smooth(method="lm") +
+#   theme_bw()
+# 
+# cor.test(data$det_fruit, data$adult_mass_g, method = "pearson")
+# cor.test(data$det_fruit, data$adult_body_length_mm, method = "pearson")
+# 
+# ggplot(data, aes(x=det_inv, y=adult_mass_g)) +
+#   geom_point() +
+#   geom_smooth(method="lm") +
+#   theme_bw()
+# 
+# ggplot(data, aes(x=det_inv, y=adult_body_length_mm)) +
+#   geom_point() +
+#   geom_smooth(method="lm") +
+#   theme_bw()
+# 
+# cor.test(data$det_inv, data$adult_mass_g, method = "pearson")
+# cor.test(data$det_inv, data$adult_body_length_mm, method = "pearson")

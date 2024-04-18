@@ -241,6 +241,11 @@ syn_iucn <- syn_iucn %>%
   mutate(synprop = yes/sample) %>%
   arrange(desc(synprop))
 
+# verifying proportions after update
+prop.table(table(datat$fam, datat$Synurbic, useNA = "ifany"), 1)
+prop.table(table(datat$category, datat$Synurbic, useNA = "ifany"), 1)
+prop.table(table(gr_dat$biogeographical_realm, gr_dat$Synurbic, useNA = "ifany"), 1)
+
 # # population trends
 # ggplot(datat, aes(population_trend)) +
 #   geom_bar(aes(fill = Synurbic), position = "Fill") +
@@ -478,3 +483,4 @@ syn_iucn <- syn_iucn %>%
 # png("/Users/brianabetke/Desktop/fig1.png",width=7,height=5,units="in",res=300)
 # fig_1 + plot_annotation(tag_levels = 'A')
 # dev.off()
+

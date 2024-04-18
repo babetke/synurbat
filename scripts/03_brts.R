@@ -28,25 +28,64 @@ library(InformationValue)
 data <- readRDS("~/Desktop/Synurbic_Bats/synurbat/flat files/cleaned dataset 30 cutoff.rds")
 
 # lab comp
-data <- readRDS("/Volumes/BETKE 2021/synurbat/flat files/cleaned dataset 30 cutoff.rds")
+# data <- readRDS("/Volumes/BETKE 2021/synurbat/flat files/cleaned dataset 30 cutoff.rds")
 
-# remove species col
-data <- data %>% 
-  select(-c(species, det_inv, biogeographical_realm)) 
+# look into distribution of continuous variables
+# pull numeric vars
+num <- select(data, where(is.numeric))
+
+# remove % diet variables
+num <- select(num, !starts_with(c("det","dphy")))
+
+# remove ordinal type variables
+num <- num %>% select(!c(litters_per_year_n, litter_size_n, island_dwelling, habitat_breadth_n))
+
+# histograms
+Hmisc::hist.data.frame(num)
+
+# log plus constant
+log_data <- data
+log_data$log_cites <- log1p(log_data$cites)
+log_data$log_lower_elevation_m <- log1p(log_data$lower_elevation_m)
+log_data$log_X26.1_GR_Area_km2 <- log1p(log_data$X26.1_GR_Area_km2)
+log_data$log_X27.1_HuPopDen_Min_n.km2 <- log1p(log_data$X27.1_HuPopDen_Min_n.km2)
+log_data$log_X27.2_HuPopDen_Mean_n.km2 <- log1p(log_data$X27.2_HuPopDen_Mean_n.km2)
+log_data$log_X27.3_HuPopDen_5p_n.km2 <- log1p(log_data$X27.3_HuPopDen_5p_n.km2)
+
+# log no constant
+log_data$log_adult_body_length_mm <- log10(log_data$adult_body_length_mm)
+log_data$log_adult_forearm_length_mm <- log10(log_data$adult_forearm_length_mm)
+log_data$log_adult_mass_g <- log10(log_data$adult_mass_g)
+
+# # remove species col
+# data <- data %>% 
+#   select(-c(species, det_inv, biogeographical_realm)) 
+
+# remove species col and non-log versions
+log_data <- log_data %>%
+  select(!c(species, det_inv, biogeographical_realm, cites, lower_elevation_m, X26.1_GR_Area_km2,
+            X27.1_HuPopDen_Min_n.km2, X27.2_HuPopDen_Mean_n.km2, X27.3_HuPopDen_5p_n.km2,
+            adult_body_length_mm, adult_forearm_length_mm, adult_mass_g))
 
 # how many NAs are there - 237
-length(data$Synurbic[is.na(data$Synurbic)])
+length(log_data$Synurbic[is.na(log_data$Synurbic)])
 
-# make Synurbic numeric (gbm will crash)
-data$Synurbic <- as.numeric(as.character(data$Synurbic))
-data$pseudo <- as.numeric(as.character(data$pseudo))
+# # make Synurbic numeric (gbm will crash)
+# data$Synurbic <- as.numeric(as.character(data$Synurbic))
+# data$pseudo <- as.numeric(as.character(data$pseudo))
 
-# # factor IUCN 
-# data$category <- as.factor(data$category)
-# data$population_trend <- as.factor(data$population_trend)
+# synrubic numeric for log data
+log_data$Synurbic <- as.numeric(as.character(log_data$Synurbic))
+log_data$pseudo <- as.numeric(as.character(log_data$pseudo))
 
-# dataset without NAs in synurbic. NAs cannot be in response.
-na.data <- data[!is.na(data$Synurbic),] # 1042 species
+# clean out NAs
+log_na.data <- log_data[!is.na(log_data$Synurbic),] # 1042 species
+
+# remove 
+rm(num)
+
+# # dataset without NAs in synurbic. NAs cannot be in response.
+# na.data <- data[!is.na(data$Synurbic),] # 1042 species
 
 # Set up BRT tuning via search grid
 # function to make grids?
@@ -409,15 +448,23 @@ get_brt <- function(data_df, response, nt, shr, int.d, nsplit, seed=NULL) {
   
 }
 
-# Run BRTs
-noNA_gbm <- get_brt(data_df = na.data, response = "Synurbic", nt = 20000, shr = 0.001, int.d = 4, nsplit = "yes")
-pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 25000, shr = 0.001, int.d = 4, nsplit = "yes")
-
-# Save 
-saveRDS(noNA_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")
-saveRDS(pseudo_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/pseudo_brts.rds")
+# # Run BRTs
+# noNA_gbm <- get_brt(data_df = na.data, response = "Synurbic", nt = 20000, shr = 0.001, int.d = 4, nsplit = "yes")
+# pseudo_gbm <- get_brt(data_df = data, response = "pseudo", nt = 25000, shr = 0.001, int.d = 4, nsplit = "yes")
+# 
+# # Save 
+# saveRDS(noNA_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/noNA_brts.rds")
+# saveRDS(pseudo_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/pseudo_brts.rds")
 
 # # save lab computer directory
 # saveRDS(noNA_gbm,"/Volumes/BETKE 2021/synurbat/flat files/noNA_brts.rds")
 # saveRDS(pseudo_gbm,"/Volumes/BETKE 2021/synurbat/flat files/pseudo_brts.rds")
+
+# brts with transformed dataframe
+log_gbm <- get_brt(data_df = log_na.data, response = "Synurbic", nt = 20000, shr = 0.001, int.d = 4, nsplit = "yes")
+log_pseudo_gbm <- get_brt(data_df = log_data, response = "pseudo", nt = 20000, shr = 0.001, int.d = 4, nsplit = "yes")
+
+# save
+saveRDS(log_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/log_brts.rds")
+saveRDS(log_pseudo_gbm,"/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/flat files/log_pseudo_brts.rds")
 
