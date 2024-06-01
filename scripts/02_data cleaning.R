@@ -155,7 +155,7 @@ names(mval)=c("comp","column")
 mval$comp=round(mval$comp,2)
 
 # ggplot of coverage
-png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/trait_coverage.png", width=9.5,height=5.5,units="in",res=600)
+# png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/trait_coverage.png", width=9.5,height=5.5,units="in",res=600)
 mval %>% 
   filter(!column %in% c("fam","tip", "gen", "cites", "iucn2020_binomial")) %>%
   ggplot(aes(comp)) +
@@ -166,7 +166,7 @@ mval %>%
   labs(y="frequency",
        x="trait coverage across bat species") +
   scale_x_continuous(labels = scales::percent)
-dev.off()
+# dev.off()
 
 mval$keep=ifelse(mval$comp>=0.30,"keep","cut")
 table(mval$keep)

@@ -67,7 +67,7 @@ log_data <- log_data %>%
             X27.1_HuPopDen_Min_n.km2, X27.2_HuPopDen_Mean_n.km2, X27.3_HuPopDen_5p_n.km2,
             adult_body_length_mm, adult_forearm_length_mm, adult_mass_g))
 
-# how many NAs are there - 237
+# how many NAs are there - 234
 length(log_data$Synurbic[is.na(log_data$Synurbic)])
 
 # # make Synurbic numeric (gbm will crash)
@@ -79,7 +79,7 @@ log_data$Synurbic <- as.numeric(as.character(log_data$Synurbic))
 log_data$pseudo <- as.numeric(as.character(log_data$pseudo))
 
 # clean out NAs
-log_na.data <- log_data[!is.na(log_data$Synurbic),] # 1042 species
+log_na.data <- log_data[!is.na(log_data$Synurbic),] # 1045 species
 
 # remove 
 rm(num)

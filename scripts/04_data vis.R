@@ -248,13 +248,13 @@ rel_gg[["rho"]]
 # Pearson's product-moment correlation
 # 
 # data:  rds_vars$rel.inf.x and rds_vars$rel.inf.y
-# t = 25.137, df = 59, p-value < 2.2e-16
+# t = 24.702, df = 59, p-value < 2.2e-16
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.9280182 0.9736782
+#  0.9256674 0.9727976
 # sample estimates:
-#       cor 
-# 0.9563463 
+#      cor 
+# 0.954899 
 
 # or inset plot
 library(cowplot)
@@ -391,21 +391,21 @@ make_pdp_fact <- function(model, predictor, var_name, pcolor = FALSE) {
 gr <- make_pdp_cont(log_brts, "log_X26.1_GR_Area_km2", "Log Geographic Area (km2)", pcolor = FALSE)
 hb <- make_pdp_cont(log_brts, "habitat_breadth_n", "Habitat Breadth", pcolor = FALSE)
 pm <- make_pdp_cont(log_brts, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = FALSE)
-at <- make_pdp_cont(log_brts, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = FALSE)
+at <- make_pdp_cont(log_brts, "X30.1_AET_Mean_mm", "Mean Monthly AET (mm)", pcolor = FALSE)
 ls <- make_pdp_cont(log_brts, "litter_size_n", "Litter Size", pcolor = FALSE)
-mp <- make_pdp_cont(log_brts, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = FALSE)
+mp <- make_pdp_cont(log_brts, "X30.2_PET_Mean_mm", "Mean Monthly PET (mm)", pcolor = FALSE)
 dp <- make_pdp_cont(log_brts, "dphy_plant","Diet Plants (%)", pcolor = FALSE)
-bl <- make_pdp_cont(log_brts, "log_adult_body_length_mm", "Log Adult Body Length", pcolor = FALSE)
-am <- make_pdp_cont(log_brts, "log_adult_mass_g","Log Adult Mass (g)", pcolor = FALSE)
+bl <- make_pdp_cont(log_brts, "log_adult_body_length_mm", "Log Adult Body Length (mm)", pcolor = FALSE)
 fr <- make_pdp_cont(log_brts, "det_fruit", "Diet Fruit (%)", pcolor = FALSE)
-mx <- make_pdp_cont(log_brts, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = FALSE)
+am <- make_pdp_cont(log_brts, "log_adult_mass_g","Log Adult Mass (g)", pcolor = FALSE)
+mx <- make_pdp_cont(log_brts, "X26.2_GR_MaxLat_dd", "Maximum Latitude (dd)", pcolor = FALSE)
 cs <- make_pdp_fact(log_brts, "category", "Conservation Status", pcolor = FALSE)
-fa <- make_pdp_cont(log_brts, "log_adult_forearm_length_mm", "Log Adult Forearm Length", pcolor = FALSE)
-ml <- make_pdp_cont(log_brts, "X26.3_GR_MinLat_dd","Minimum Latitude", pcolor = FALSE)
+fa <- make_pdp_cont(log_brts, "log_adult_forearm_length_mm", "Log Adult Forearm Length (mm)", pcolor = FALSE)
 hp <- make_pdp_cont(log_brts, "log_X27.2_HuPopDen_Mean_n.km2", "Log Mean Human Density", pcolor = FALSE)
+ml <- make_pdp_cont(log_brts, "X26.3_GR_MinLat_dd","Minimum Latitude (dd)", pcolor = FALSE)
 
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure 3.png", width=7,height=7.5,units="in",res=300)
-gr + hb + pm + at + ls + mp + dp + bl + am + fr + mx + cs + fa + ml + hp + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+gr + hb + pm + at + ls + mp + dp + bl + fr + am + mx + cs + fa + hp + ml + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
 # png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/pdp 9 no NAs.png", width=10,height=8,units="in",res=300)
@@ -438,22 +438,22 @@ dev.off()
 phb <- make_pdp_cont(log_pseudo_brts,"habitat_breadth_n", "Habitat Breadth", pcolor = TRUE)
 pgr <- make_pdp_cont(log_pseudo_brts, "log_X26.1_GR_Area_km2", "Log Geographic Area (km2)", pcolor = TRUE)
 ppm <- make_pdp_cont(log_pseudo_brts, "X28.1_Precip_Mean_mm", "Mean Monthly Precipitation (mm)", pcolor = TRUE)
-pat <- make_pdp_cont(log_pseudo_brts, "X30.1_AET_Mean_mm", "Mean Monthly AET", pcolor = TRUE)
+pat <- make_pdp_cont(log_pseudo_brts, "X30.1_AET_Mean_mm", "Mean Monthly AET (mm)", pcolor = TRUE)
 pls <- make_pdp_cont(log_pseudo_brts, "litter_size_n", "Litter Size", pcolor = TRUE)
 pdp <- make_pdp_cont(log_pseudo_brts, "dphy_plant","Diet Plants (%)", pcolor = TRUE)
 pcc <- make_pdp_cont(log_pseudo_brts, "log_cites","Log Citation Count", pcolor = TRUE)
-pmx <- make_pdp_cont(log_pseudo_brts, "X26.2_GR_MaxLat_dd", "Maximum Latitude", pcolor = TRUE)
 pcs <- make_pdp_fact(log_pseudo_brts, "category","Conservation Status", pcolor = TRUE)
-pml <- make_pdp_cont(log_pseudo_brts, "X26.3_GR_MinLat_dd", "Minimum Latitude", pcolor = TRUE)
-ppt <- make_pdp_cont(log_pseudo_brts, "X30.2_PET_Mean_mm", "Mean Monthly PET", pcolor = TRUE)
+ppt <- make_pdp_cont(log_pseudo_brts, "X30.2_PET_Mean_mm", "Mean Monthly PET (mm)", pcolor = TRUE)
+pmx <- make_pdp_cont(log_pseudo_brts, "X26.2_GR_MaxLat_dd", "Maximum Latitude (dd)", pcolor = TRUE)
+pml <- make_pdp_cont(log_pseudo_brts, "X26.3_GR_MinLat_dd", "Minimum Latitude (dd)", pcolor = TRUE)
 pfr <- make_pdp_cont(log_pseudo_brts, "det_fruit", "Diet Fruit (%)", pcolor = TRUE)
 pam <- make_pdp_cont(log_pseudo_brts, "log_adult_mass_g","Log Adult Mass (g)", pcolor = TRUE)
-pbl <- make_pdp_cont(log_pseudo_brts, "log_adult_body_length_mm", "Log Adult Body Length", pcolor = TRUE)
-pfa <- make_pdp_cont(log_pseudo_brts, "log_adult_forearm_length_mm", "Log Adult Forearm Length", pcolor = TRUE)
+pbl <- make_pdp_cont(log_pseudo_brts, "log_adult_body_length_mm", "Log Adult Body Length (mm)", pcolor = TRUE)
+pfa <- make_pdp_cont(log_pseudo_brts, "log_adult_forearm_length_mm", "Log Adult Forearm Length (mm)", pcolor = TRUE)
 
 # Save
 png("/Users/brianabetke/Desktop/Synurbic_Bats/synurbat/figures/Figure S2.png", width=7,height=7.5,units="in",res=300)
-phb + pgr + ppm + pat + pls + pdp + pcc + pmx + pcs + ppt + pml + pam + pfr + pbl + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
+phb + pgr + ppm + pat + pls + pdp + pcc + pcs + ppt + pmx + pml + pfr + pam + pbl + pfa + plot_layout(nrow = 5, ncol = 3, byrow = TRUE)
 dev.off()
 
 ######## PGLS instead in PCM script
