@@ -1,6 +1,6 @@
 ## 01_phylogenetic analyses of bat roosting data
 ## danbeck@ou.edu
-## last updated 03/24/2024
+## last updated 06/01/2024
 
 ## clean environment & plots
 rm(list=ls()) 
@@ -84,7 +84,6 @@ cdata$data$label=cdata$data$tip
 cdata$data$sgroup=factor(cdata$data$Synurbic)
 
 ## pgls models for geographic range and size
-mod=pgls(log10(X26.1_GR_Area_km2)~log10(adult_mass_g),data=cdata,lambda="ML"); summary(mod)
 mod=pgls(log10(X26.1_GR_Area_km2)~adult_forearm_length_mm,data=cdata,lambda="ML"); summary(mod)
 
 ## pgls models for forearm
@@ -383,7 +382,8 @@ bisse_plot=ggplot(tmp,aes(par2,est,colour=type,fill=type))+
   theme(axis.text.y=element_text(size=12))+
   guides(colour="none",fill="none")+
   scale_colour_manual(values=rev(scols))+
-  scale_fill_manual(values=rev(scols))
+  scale_fill_manual(values=rev(scols))+
+  scale_y_continuous(limit=c(0,0.5))
 
 ## set prior on root node as non-anthropogenic
 rootn=c(1,0)
